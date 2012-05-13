@@ -391,7 +391,7 @@ class EnsimeClient(EnsimeMessageHandler):
     self.req([sym("swank:typecheck-file"), file_path], on_complete)
 
   def organize_imports(self, file_path, on_complete):
-    self.req([sym("swank:perform-refactor"),
+    self.req([sym("swank:exec-refactor"),
               self.next_procedure_id(),
               sym("organizeImports"), 
               [sym("file"),file_path], 
