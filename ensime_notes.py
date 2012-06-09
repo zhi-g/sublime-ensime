@@ -20,7 +20,7 @@ class LangNote:
 
 def lang_note(lang, m):
   return LangNote(
-    lang, 
+    lang,
     m[":msg"],
     m[":file"],
     m[":severity"],
@@ -32,7 +32,7 @@ def lang_note(lang, m):
 def erase_error_highlights(view):
   view.erase_regions("ensime-error")
   view.erase_regions("ensime-error-underline")
-  
+
 def highlight_errors(view, notes):
   if notes is None:
     print "There were no notes?"
@@ -48,9 +48,9 @@ def highlight_errors(view, notes):
     "invalid.illegal",
     sublime.DRAW_EMPTY_AS_OVERWRITE)
   view.add_regions(
-    "ensime-error", 
-    errors, 
-    "invalid.illegal", 
+    "ensime-error",
+    errors,
+    "invalid.illegal",
     "cross",
     sublime.DRAW_OUTLINED)
 
