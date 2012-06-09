@@ -371,7 +371,7 @@ class EnsimeClient(EnsimeMessageHandler):
   def initialize_project(self, on_complete):
     conf = self.project_config()
     m = sexp.sexp_to_key_map(conf)
-    subprojects = [sexp.sexp_to_key_map(p) for p in m[":subprojects"]]
+    subprojects = [sexp.sexp_to_key_map(p) for p in m.get(":subprojects", [])]
     names = [p[":name"] for p in subprojects]
     if len(names) > 1:
       self.window.show_quick_panel(
