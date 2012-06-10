@@ -88,6 +88,7 @@ class AsyncProcess(object):
           job = killableprocess.winprocess.OpenJobObject(0x1F001F, True, "sublime-ensime-" + str(sublimepid))
           killableprocess.winprocess.TerminateJobObject(job, 127)
         except:
+          print sys.exc_info()[1]
           pass
     else:
       # todo. Vlad, please, implement similar logic for Linux
@@ -187,31 +188,90 @@ class EnsimeCommon:
     if not self.env().repl_view:
       w = self.window if hasattr(self, "window") and self.window else sublime.active_window()
       self.env().repl_view = w.get_output_panel("ensime_client_server_repl")
+      if not self.env().repl_view.settings().get("word_wrap"):
+        self.env().repl_view.run_command("toggle_setting", {"setting": "word_wrap"})
     return self.env().repl_view
 
-  def repl_insert(self, what):
-    selection_was_at_end = (len(self.repl_view().sel()) == 1 and self.repl_view().sel()[0] == sublime.Region(self.repl_view().size()))
-    was_read_only = self.repl_view().is_read_only()
-    self.repl_view().set_read_only(False)
-    edit = self.repl_view().begin_edit()
-    last = self.env().repl_last_insert
-    current = self.repl_view().size()
-    user_input = ""
-    if current - last > 7:
-      user_input = self.repl_view().substr(sublime.Region(last, current))
-    self.repl_view().insert(edit, current, what)
-    if selection_was_at_end:
-        self.repl_view().show(current)
-    if current - last > 7:
-      self.repl_view().insert(edit, self.repl_view().size(), "ensime>" + user_input)
-    self.repl_view().end_edit(edit)
-    self.env().repl_last_insert = current + len(what)
-    self.repl_view().set_read_only(was_read_only)
+  def repl_lock(self):
+    return self.env().repl_lock
 
-  def repl_input(self):
-    last = self.env().repl_last_insert
-    current = self.repl_view().size()
-    return self.repl_saved_user_input + self.repl_view().substr(sublime.Region(last, current))
+  def repl_show(self):
+    self.env().repl_lock.acquire()
+    try:
+      # print "repl_show"
+      last = self.env().repl_last_insert
+      current = self.repl_view().size()
+      if (last == current):
+        self.repl_insert("ensime>", False)
+      self.window.run_command("show_panel", {"panel": "output.ensime_client_server_repl"})
+      self.window.focus_view(self.repl_view())
+      sublime.set_timeout(functools.partial(self.repl_view().show, self.repl_view().size()), 100)
+    finally:
+      self.env().repl_lock.release()
+
+  def repl_insert(self, what, rewind = True):
+    self.env().repl_lock.acquire()
+    try:
+      # print "repl_insert"
+      selection_was_at_end = (len(self.repl_view().sel()) == 1 and self.repl_view().sel()[0] == sublime.Region(self.repl_view().size()))
+      was_read_only = self.repl_view().is_read_only()
+      self.repl_view().set_read_only(False)
+      edit = self.repl_view().begin_edit()
+      last = self.env().repl_last_insert
+      current = self.repl_view().size()
+      # print "rewind: " + str(rewind) + ", insert: "+ what[:10] + ", last: " + str(last) + ", current: " + str(current)
+      # print str(self.repl_view().visible_region())
+      if rewind:
+        user_input = ""
+        if current - last >= 7:
+          user_input = self.repl_view().substr(sublime.Region(last + 7, current))
+      self.repl_view().insert(edit, current, what)
+      if rewind:
+        self.env().repl_last_insert = self.repl_view().size()
+        if current - last >= 7:
+          self.repl_schedule_fixup(user_input, self.env().repl_last_insert)
+      if selection_was_at_end:
+        self.repl_view().show(self.repl_view().size())
+        self.repl_view().sel().clear()
+        self.repl_view().sel().add(sublime.Region(self.repl_view().size()))
+      self.repl_view().end_edit(edit)
+      self.repl_view().set_read_only(was_read_only)
+    finally:
+      self.env().repl_lock.release()
+
+  def repl_schedule_fixup(self, what, last_insert):
+    sublime.set_timeout(functools.partial(self.repl_insert_fixup, what, last_insert), 1000)
+
+  def repl_insert_fixup(self, what, last_insert):
+    self.env().repl_lock.acquire()
+    try:
+      if self.env().repl_last_fixup < last_insert:
+        self.env().repl_last_fixup = last_insert
+        if self.env().repl_last_insert == last_insert:
+          selection_was_at_end = (len(self.repl_view().sel()) == 1 and self.repl_view().sel()[0] == sublime.Region(self.repl_view().size()))
+          was_read_only = self.repl_view().is_read_only()
+          self.repl_view().set_read_only(False)
+          edit = self.repl_view().begin_edit()
+          self.repl_view().insert(edit, self.repl_view().size(), "ensime>" + what)
+          if selection_was_at_end:
+            self.repl_view().show(self.repl_view().size())
+            self.repl_view().sel().clear()
+            self.repl_view().sel().add(sublime.Region(self.repl_view().size()))
+          self.repl_view().end_edit(edit)
+          self.repl_view().set_read_only(was_read_only)
+        self.repl_schedule_fixup(what, self.env().repl_last_insert)
+    finally:
+      self.env().repl_lock.release()
+
+  def repl_get_input(self):
+    self.env().repl_lock.acquire()
+    try:
+      # print "repl_get_input"
+      last = self.env().repl_last_insert
+      current = self.repl_view().size()
+      return self.repl_saved_user_input + self.repl_view().substr(sublime.Region(last, current))
+    finally:
+      self.env().repl_lock.release()
 
 class EnsimeOnly(EnsimeCommon):
   def is_enabled(self, kill = False):
@@ -248,7 +308,10 @@ class EnsimeServerCommand(sublime_plugin.WindowCommand,
 
   def show_output_window(self, show_output = False):
     if show_output:
+      v = ensime_environment.ensime_env.server_view
       self.window.run_command("show_panel", {"panel": "output.ensime_server"})
+      # self.window.focus_view(v)
+      sublime.set_timeout(functools.partial(v.show, v.size()), 100)
 
   def ensime_command(self):
     if os.name == 'nt':
@@ -295,6 +358,9 @@ class EnsimeServerCommand(sublime_plugin.WindowCommand,
 
     if not hasattr(self, 'output_view'):
       self.output_view = self.window.get_output_panel("ensime_server")
+      if not self.output_view.settings().get("word_wrap"):
+        self.output_view.run_command("toggle_setting", {"setting": "word_wrap"})
+      ensime_environment.ensime_env.server_view = self.output_view
 
     self.quiet = quiet
 
@@ -399,7 +465,7 @@ class EnsimeUpdateMessagesView(sublime_plugin.WindowCommand, EnsimeOnly):
       ov.end_edit(edit)
       ov.set_read_only(True)
 
-      self.repl_insert(msg)
+      self.repl_insert(str(msg) + "\n")
 
 
 class CreateEnsimeClientCommand(sublime_plugin.WindowCommand, EnsimeOnly):
@@ -412,7 +478,10 @@ class CreateEnsimeClientCommand(sublime_plugin.WindowCommand, EnsimeOnly):
 class EnsimeShowMessageViewCommand(EnsimeOnly, sublime_plugin.WindowCommand):
 
   def run(self):
+    v = ensime_environment.ensime_env.client_view
     self.window.run_command("show_panel", {"panel": "output.ensime_messages"})
+    # self.window.focus_view(v)
+    sublime.set_timeout(functools.partial(v.show, v.size()), 100)
 
 class EnsimeShowClientServerReplCommand(EnsimeOnly, sublime_plugin.WindowCommand):
 
@@ -423,13 +492,7 @@ class EnsimeShowClientServerReplCommand(EnsimeOnly, sublime_plugin.WindowCommand
   # F1 on a command name or on a completion shows docs on a split panel
 
   def run(self):
-    last = self.env().repl_last_insert
-    current = self.repl_view().size()
-    if (last == current):
-      self.repl_insert("ensime>")
-    self.window.run_command("show_panel", {"panel": "output.ensime_client_server_repl"})
-    self.window.focus_view(self.repl_view())
-    self.repl_view().show(self.repl_view().size())
+    self.repl_show()
 
 class EnsimeHandshakeCommand(sublime_plugin.WindowCommand, EnsimeOnly):
 

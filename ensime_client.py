@@ -200,6 +200,9 @@ class EnsimeClient(EnsimeMessageHandler):
     self._readyLock = threading.RLock()
     self.window = window
     self.output_view = self.window.get_output_panel("ensime_messages")
+    if not self.output_view.settings().get("word_wrap"):
+      self.output_view.run_command("toggle_setting", {"setting": "word_wrap"})
+    ensime_environment.ensime_env.client_view = self.output_view
     self.message_handlers = dict()
     self.procedure_handlers = dict()
     self._counter = 0
