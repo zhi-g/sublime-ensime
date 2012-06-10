@@ -1,4 +1,4 @@
-import os, sys, stat, time, datetime, re, random
+import os, sys, stat, tempfile, time, datetime, re, random
 from ensime_client import *
 import ensime_environment
 import functools, socket, threading
@@ -206,10 +206,13 @@ class EnsimeServerCommand(sublime_plugin.WindowCommand,
         sublime.set_timeout(
           functools.partial(ensime_environment.ensime_env.set_client, cl), 0)
         vw = self.window.active_view()
+        _, port_file = tempfile.mkstemp("ensime_port")
+        # port_file = self.ensime_project_root() + "/.ensime_port"
+        ensime_environment.ensime_env.port_file = port_file
         self.proc = AsyncProcess([server_path + '/' + self.ensime_command(),
-				  self.ensime_project_root() + "/.ensime_port"],
-				  self,
-				  server_path)
+                                  port_file],
+                                  self,
+                                  server_path)
     except err_type as e:
       print str(e)
       self.append_data(None, str(e) + '\n')

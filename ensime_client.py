@@ -1,4 +1,5 @@
 import os, sys, stat, time, datetime, re
+import ensime_environment
 import functools, socket, threading
 import sublime_plugin, sublime
 import sexp
@@ -28,7 +29,7 @@ class EnsimeServerClient:
     self._receiver = None
 
   def port(self):
-    return int(open(self.project_root + "/.ensime_port").read())
+    return int(open(ensime_environment.ensime_env.port_file).read())
 
   def receive_loop(self):
     while self.connected:
