@@ -1,6 +1,6 @@
 import os, os.path, sys, stat, functools
 import sublime, sublime_plugin
-from ensime_server import EnsimeOnly
+from ensime_server import ConnectedEnsimeOnly
 from ensime_client import EnsimeMessageHandler
 import ensime_environment
 import sexp
@@ -57,13 +57,12 @@ def highlight_errors(view, notes):
       ensime_env.settings.get("error_icon", "cross"),
       sublime.DRAW_OUTLINED)
 
-class EnsimeHighlightCommand(sublime_plugin.WindowCommand):
+class EnsimeHighlightCommand(ConnectedEnsimeOnly, sublime_plugin.WindowCommand):
 
   def is_enabled(self, enable = True):
     now = not not ensime_env.settings.get("error_highlight")
     wannabe = not not enable
-    client = ensime_environment.ensime_env.client()
-    running = client and hasattr(client, "connected") and client.connected
+    running = ConnectedEnsimeOnly.is_enabled(self)
     return running and now != wannabe
 
   def run(self, enable = True):
@@ -77,7 +76,7 @@ class EnsimeHighlightCommand(sublime_plugin.WindowCommand):
 
 view_notes = {}
 
-class EnsimeNotes(sublime_plugin.TextCommand, EnsimeOnly):
+class EnsimeNotes(ConnectedEnsimeOnly, sublime_plugin.TextCommand):
 
   def run(self, edit, action = "add", lang = "scala", value=None):
 
@@ -145,7 +144,7 @@ class BackgroundTypeChecker(sublime_plugin.EventListener):
 
 
 
-class EnsimeInspectTypeAtPoint(sublime_plugin.TextCommand, EnsimeOnly):
+class EnsimeInspectTypeAtPoint(ConnectedEnsimeOnly, sublime_plugin.TextCommand):
 
   def handle_reply(self, data):
     d = data[1][1]
