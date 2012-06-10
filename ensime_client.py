@@ -21,6 +21,7 @@ class EnsimeServerClient:
   def __init__(self, project_root, handler):
     self.project_root = project_root
     self.connected = False
+    self.disconnect_pending = False
     self.handler = handler
     self._lock = threading.RLock()
     self._connect_lock = threading.RLock()
@@ -54,7 +55,9 @@ class EnsimeServerClient:
       except Exception as e:
         print "*****    ERROR     *****"
         print e
-        self.handler.on_disconnect("server")
+        reason = "server" if not self.disconnect_pending else "client"
+        self.disconnect_pending = False
+        self.handler.on_disconnect(reason)
         self.set_connected(False)
 
   def set_connected(self, val):
@@ -348,6 +351,7 @@ class EnsimeClient(EnsimeMessageHandler):
     msgcnt = self.next_message_id()
     msg_str = sexp.to_string(self.format(to_send, msgcnt))
     print "SEND: " + msg_str
+    self.client.disconnect_pending = True
     return self.client.sync_send(self.prepend_length(msg_str), msgcnt)
 
 
