@@ -70,7 +70,7 @@ class EnsimeTypeCheckFileCommand(sublime_plugin.TextCommand, EnsimeOnly):
 
       repl = self.handle_reply
       cl = ensime_environment.ensime_env.client()
-      if not cl is None:
+      if not cl is None and cl.client.connected:
         cl.type_check_file(fname, repl)
 
 class EnsimeOrganizeImportsCommand(sublime_plugin.TextCommand, EnsimeOnly):
