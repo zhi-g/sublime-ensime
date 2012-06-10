@@ -1,6 +1,7 @@
 import os, os.path, sys, stat, functools
 import sublime, sublime_plugin
 from ensime_server import EnsimeOnly
+from ensime_client import EnsimeMessageHandler
 import ensime_environment
 import sexp
 
@@ -106,6 +107,16 @@ class EnsimeNotes(sublime_plugin.TextCommand, EnsimeOnly):
 def run_check(view):
     view.checked = True
     view.run_command("ensime_type_check_file")
+
+class EnsimeNotesMessageHandler(EnsimeMessageHandler):
+
+  def on_disconnect(self, reason):
+    sublime.set_timeout(self.do_erase_error_highlights, 0)
+
+  def do_erase_error_highlights(self):
+    for v in sublime.active_window().views():
+      erase_error_highlights(v)
+
 
 class BackgroundTypeChecker(sublime_plugin.EventListener):
 
