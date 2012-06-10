@@ -1,4 +1,4 @@
-import os, os.path, sys, stat, functools
+import os, sys, stat, functools
 import sublime, sublime_plugin
 from ensime_server import EnsimeOnly
 import ensime_environment
@@ -42,37 +42,17 @@ def highlight_errors(view, notes):
   underlines = []
   for note in notes:
     underlines += [sublime.Region(int(pos)) for pos in range(note.start, note.end)]
-  if ensime_env.settings.get("error_highlight") and ensime_env.settings.get("error_underline"):
-    view.add_regions(
-      "ensime-error-underline",
-      underlines,
-      "invalid.illegal",
-      sublime.DRAW_EMPTY_AS_OVERWRITE)
-  if ensime_env.settings.get("error_highlight"):
-    view.add_regions(
-      "ensime-error",
-      errors,
-      "invalid.illegal",
-      ensime_env.settings.get("error_icon", "cross"),
-      sublime.DRAW_OUTLINED)
-
-class EnsimeHighlightCommand(sublime_plugin.WindowCommand):
-
-  def is_enabled(self, enable = True):
-    now = not not ensime_env.settings.get("error_highlight")
-    wannabe = not not enable
-    client = ensime_environment.ensime_env.client()
-    running = client and hasattr(client, "connected") and client.connected
-    return running and now != wannabe
-
-  def run(self, enable = True):
-    v = self.window.active_view()
-    ensime_env.settings.set("error_highlight", not not enable)
-    sublime.save_settings("Ensime.sublime-settings")
-    if v:
-      erase_error_highlights(v)
-      if enable:
-        run_check(v)
+  view.add_regions(
+    "ensime-error-underline",
+    underlines,
+    "invalid.illegal",
+    sublime.DRAW_EMPTY_AS_OVERWRITE)
+  view.add_regions(
+    "ensime-error",
+    errors,
+    "invalid.illegal",
+    "cross",
+    sublime.DRAW_OUTLINED)
 
 view_notes = {}
 
@@ -113,23 +93,16 @@ class BackgroundTypeChecker(sublime_plugin.EventListener):
   def _is_valid_file(self, view):
     return bool(not view.file_name() is None and view.file_name().endswith(("scala","java")))
 
-  def _is_applicable_file(self, view):
-    if self._is_valid_file(view) and ensime_env.client():
-      root = os.path.normcase(os.path.realpath(ensime_env.client().project_root))
-      wannabe = os.path.normcase(os.path.realpath(view.file_name()))
-      # print "root = " + root + ", wannabe = " + wannabe
-      return wannabe.startswith(root)
-
   def on_load(self, view):
-    if self._is_applicable_file(view):
+    if self._is_valid_file(view):
       run_check(view)
 
   def on_post_save(self, view):
-    if self._is_applicable_file(view):
+    if self._is_valid_file(view):
       run_check(view)
 
   def on_selection_modified(self, view):
-    if self._is_applicable_file(view):
+    if self._is_valid_file(view):
       view.run_command("ensime_notes", { "action": "display" })
 
 

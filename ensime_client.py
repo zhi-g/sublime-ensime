@@ -55,6 +55,7 @@ class EnsimeServerClient:
           self.set_connected(False)
       except Exception as e:
         print "*****    ERROR     *****"
+        print "expected disconnect" if self.disconnect_pending else "unexpected disconnect"
         print e
         reason = "server" if not self.disconnect_pending else "client"
         self.disconnect_pending = False
@@ -298,8 +299,10 @@ class EnsimeClient(EnsimeMessageHandler):
     finally:
       self._counterLock.release()
 
-    if reason == "server":
-      sublime.error_message("The ensime server was disconnected, you might want to restart it.")
+    # todo. enable this when we figure out how to prevent this message from firing
+    # when we are killing an orphan, and its client whines out loud
+    # if reason == "server":
+    #   sublime.error_message("The ensime server was disconnected, you might want to restart it.")
 
   def project_config(self):
     try:
