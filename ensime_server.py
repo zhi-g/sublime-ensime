@@ -148,11 +148,11 @@ class EnsimeServerCommand(sublime_plugin.WindowCommand,
 
   def run(self, encoding = "utf-8", env = {},
           start = False, quiet = True, kill = False,
-          show_output = True):
+          show_output = None):
     print "Running: " + self.__class__.__name__
-    self.show_output = show_output
     if not hasattr(self, 'settings'):
       self.settings = sublime.load_settings("Ensime.sublime-settings")
+    self.show_output = show_output = show_output if show_output != None else self.settings.get("show_output_during_server_startup", False)
 
     server_dir = self.settings.get("ensime_server_path", self.default_ensime_install_path())
     server_path = server_dir if server_dir.startswith("/") else os.path.join(sublime.packages_path(), server_dir)
