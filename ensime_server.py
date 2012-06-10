@@ -169,7 +169,7 @@ class ScalaOnly:
     _, fname = os.path.split(file_name)
     return fname.lower().endswith(".scala")
 
-class EnsimeOnly:
+class EnsimeCommon:
   def ensime_project_file(self):
     w = self.window if hasattr(self, "window") and self.window else sublime.active_window()
     prj_files = [(f + "/.ensime") for f in w.folders() if os.path.exists(f + "/.ensime")]
@@ -180,13 +180,47 @@ class EnsimeOnly:
       #sublime.error_message("There are no open folders. Please open a folder containing a .ensime file.")
       return None
 
+  def env(self):
+    return ensime_environment.ensime_env
+
+  def repl_view(self):
+    if not self.env().repl_view:
+      w = self.window if hasattr(self, "window") and self.window else sublime.active_window()
+      self.env().repl_view = w.get_output_panel("ensime_client_server_repl")
+    return self.env().repl_view
+
+  def repl_insert(self, what):
+    selection_was_at_end = (len(self.repl_view().sel()) == 1 and self.repl_view().sel()[0] == sublime.Region(self.repl_view().size()))
+    was_read_only = self.repl_view().is_read_only()
+    self.repl_view().set_read_only(False)
+    edit = self.repl_view().begin_edit()
+    last = self.env().repl_last_insert
+    current = self.repl_view().size()
+    user_input = ""
+    if current - last > 7:
+      user_input = self.repl_view().substr(sublime.Region(last, current))
+    self.repl_view().insert(edit, current, what)
+    if selection_was_at_end:
+        self.repl_view().show(current)
+    if current - last > 7:
+      self.repl_view().insert(edit, self.repl_view().size(), "ensime>" + user_input)
+    self.repl_view().end_edit(edit)
+    self.env().repl_last_insert = current + len(what)
+    self.repl_view().set_read_only(was_read_only)
+
+  def repl_input(self):
+    last = self.env().repl_last_insert
+    current = self.repl_view().size()
+    return self.repl_saved_user_input + self.repl_view().substr(sublime.Region(last, current))
+
+class EnsimeOnly(EnsimeCommon):
   def is_enabled(self, kill = False):
-    c = ensime_environment.ensime_env.client()
+    c = self.env().client()
     return bool(c) and c.ready() and bool(self.ensime_project_file())
 
-class ConnectedEnsimeOnly:
+class ConnectedEnsimeOnly(EnsimeCommon):
   def is_enabled(self):
-    c = ensime_environment.ensime_env.client()
+    c = self.env().client()
     # print "hello from " + str(self)
     # from pprint import pprint
     # pprint (vars(c))
@@ -329,6 +363,8 @@ class EnsimeServerCommand(sublime_plugin.WindowCommand,
     self.output_view.end_edit(edit)
     self.output_view.set_read_only(True)
 
+    self.repl_insert(str_data)
+
   def finish(self, proc):
     if proc != self.proc:
       return
@@ -363,6 +399,9 @@ class EnsimeUpdateMessagesView(sublime_plugin.WindowCommand, EnsimeOnly):
       ov.end_edit(edit)
       ov.set_read_only(True)
 
+      self.repl_insert(msg)
+
+
 class CreateEnsimeClientCommand(sublime_plugin.WindowCommand, EnsimeOnly):
 
   def run(self):
@@ -374,6 +413,23 @@ class EnsimeShowMessageViewCommand(EnsimeOnly, sublime_plugin.WindowCommand):
 
   def run(self):
     self.window.run_command("show_panel", {"panel": "output.ensime_messages"})
+
+class EnsimeShowClientServerReplCommand(EnsimeOnly, sublime_plugin.WindowCommand):
+
+  # support `cls`
+  # rebind Enter, Escape, Backspace, Left, ShiftLeft, Home, ShiftHome
+  # persistent command history and Ctrl+Up/Ctrl+Down like in SublimeREPL
+  # completions for command names
+  # F1 on a command name or on a completion shows docs on a split panel
+
+  def run(self):
+    last = self.env().repl_last_insert
+    current = self.repl_view().size()
+    if (last == current):
+      self.repl_insert("ensime>")
+    self.window.run_command("show_panel", {"panel": "output.ensime_client_server_repl"})
+    self.window.focus_view(self.repl_view())
+    self.repl_view().show(self.repl_view().size())
 
 class EnsimeHandshakeCommand(sublime_plugin.WindowCommand, EnsimeOnly):
 
