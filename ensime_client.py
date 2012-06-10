@@ -301,15 +301,10 @@ class EnsimeClient(EnsimeMessageHandler):
     if reason == "server":
       sublime.error_message("The ensime server was disconnected, you might want to restart it.")
 
-  def project_file(self):
-    if self.ready:
-      return os.path.join(self.project_root, ".ensime")
-    else:
-      return None
-
   def project_config(self):
     try:
-      src = open(self.project_file()).read() if self.project_file() else "()"
+      project_file = os.path.join(self.project_root, ".ensime") if self.ready else None
+      src = open(project_file).read() if project_file else "()"
       conf = sexp.read(src)
       return conf
     except StandardError:
@@ -369,22 +364,33 @@ class EnsimeClient(EnsimeMessageHandler):
     self.req([sym("swank:connection-info")], on_complete)
 
   def __initialize_project(self, conf, subproj_name, on_complete):
-    conf = conf + [key(":root-dir"), self.project_root]
-    conf = conf + [key(":active-subproject"), subproj_name]
+    m = sexp.sexp_to_key_map(conf)
+    if m.get(":root-dir"):
+      self.client.project_root = m[":root-dir"]
+      self.project_root = m[":root-dir"]
+    else:
+      conf = conf + [key(":root-dir"), self.project_root]
+    if not m.get(":active_subproject"):
+      conf = conf + [key(":active-subproject"), subproj_name]
     self.req([sym("swank:init-project"), conf], on_complete)
+
+  def select_subproject(self, conf, cont):
+    m = sexp.sexp_to_key_map(conf)
+    if m.get("active_subproject"):
+      cont(m[":active_subproject"])
+    else:
+      subprojects = [sexp.sexp_to_key_map(p) for p in m.get(":subprojects", [])]
+      names = [p[":name"] for p in subprojects]
+      if len(names) > 1:
+        self.window.show_quick_panel(names, lambda i: cont(names[i]))
+      elif len(names) == 1:
+        cont(names[0])
+      else:
+        cont("NA")
 
   def initialize_project(self, on_complete):
     conf = self.project_config()
-    m = sexp.sexp_to_key_map(conf)
-    subprojects = [sexp.sexp_to_key_map(p) for p in m.get(":subprojects", [])]
-    names = [p[":name"] for p in subprojects]
-    if len(names) > 1:
-      self.window.show_quick_panel(
-        names, lambda i: self.__initialize_project(conf,names[i],on_complete))
-    elif len(names) == 1:
-      self.__initialize_project(conf,names[0],on_complete)
-    else:
-      self.__initialize_project(conf,"NA",on_complete)
+    self.select_subproject(conf, lambda name: self.__initialize_project(conf, name, on_complete))
 
   def format_source(self, file_path, on_complete):
     self.req([sym("swank:format-source"),[file_path]], on_complete)

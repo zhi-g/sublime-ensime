@@ -103,6 +103,7 @@ class EnsimeOnly:
     if len(prj_files) > 0:
       return prj_files[0]
     else:
+      print "There are no open folders. Please open a folder containing a .ensime file."
       #sublime.error_message("There are no open folders. Please open a folder containing a .ensime file.")
       return None
 
