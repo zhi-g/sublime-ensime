@@ -157,6 +157,10 @@ class EnsimeServerCommand(sublime_plugin.WindowCommand,
     server_dir = self.settings.get("ensime_server_path", self.default_ensime_install_path())
     server_path = server_dir if server_dir.startswith("/") else os.path.join(sublime.packages_path(), server_dir)
 
+    if not os.path.exists(server_path):
+      sublime.error_message("Ensime server path \"" + server_path + "\" points to a non-existent directory. Check your Ensime.sublime-settings.")
+      return
+
     if kill:
       ensime_environment.ensime_env.client().sync_req([sym("swank:shutdown-server")])
       ensime_environment.ensime_env.client().disconnect()
