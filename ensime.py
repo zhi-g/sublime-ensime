@@ -345,9 +345,10 @@ class EnsimeClientListener:
     pass
 
 class EnsimeClientSocket(EnsimeCommon):
-  def __init__(self, owner, port, handlers):
+  def __init__(self, owner, port, timeout, handlers):
     super(EnsimeClientSocket, self).__init__(owner)
     self.port = port
+    self.timeout = timeout
     self.connected = False
     self.handlers = handlers
     self._lock = threading.RLock()
@@ -403,7 +404,7 @@ class EnsimeClientSocket(EnsimeCommon):
     self._connect_lock.acquire()
     try:
       s = socket.socket()
-      s.settimeout(3)
+      s.settimeout(self.timeout)
       # todo. even with settimeout, connect hangs Sublime if there's noone at self.port
       s.connect(("127.0.0.1", self.port))
       s.settimeout(None)
@@ -492,9 +493,10 @@ class EnsimeCodec:
 ensime_codec = EnsimeCodec()
 
 class EnsimeClient(EnsimeClientListener, EnsimeCommon):
-  def __init__(self, owner, port_file):
+  def __init__(self, owner, port_file, timeout):
     super(EnsimeClient, self).__init__(owner)
     with open(port_file) as f: self.port = int(f.read())
+    self.timeout = timeout
     self.init_counters()
     methods = filter(lambda m: m[0].startswith("message_"), inspect.getmembers(self, predicate=inspect.ismethod))
     self.log_client("reflectively found " + str(len(methods)) + " message handlers: " + str(methods))
@@ -503,7 +505,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
   def startup(self):
     self.log_client("[" + str(datetime.datetime.now()) + "] Starting ENSIME client")
     self.log_client("Launching ENSIME client socket at port " + str(self.port))
-    self.socket = EnsimeClientSocket(self.owner, self.port, [self, self.env.controller])
+    self.socket = EnsimeClientSocket(self.owner, self.port, self.timeout, [self, self.env.controller])
     self.socket.connect()
 
   def shutdown(self):
@@ -535,11 +537,11 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     self.log_client("SEND SYNC REQ: " + msg_str)
     self.socket.send(msg_str)
 
-    event.wait(3)
+    event.wait(self.timeout)
     if hasattr(event, "payload"):
       return event.payload
     else:
-      self.log_client("sync_req has timed out")
+      self.log_client("sync_req #" + str(msg_id) + " has timed out (didn't get a response after " + str(self.timeout) + " seconds)")
       return None
 
   def on_client_async_data(self, data):
@@ -882,7 +884,8 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
       sublime.set_timeout(functools.partial(self.request_handshake), 0)
 
   def request_handshake(self):
-    self.client = EnsimeClient(self.owner, self.port_file)
+    timeout = self.env.settings.get("rpc_timeout", 3)
+    self.client = EnsimeClient(self.owner, self.port_file, timeout)
     self.client.startup()
     self.client.async_req([sym("swank:connection-info")], self.response_handshake, call_back_into_ui_thread = True)
 
