@@ -354,6 +354,7 @@ class EnsimeClientSocket(EnsimeCommon):
     self._lock = threading.RLock()
     self._connect_lock = threading.RLock()
     self._receiver = None
+    self.socket = None
 
   def notify_async_data(self, data):
     for handler in self.handlers:
@@ -405,7 +406,6 @@ class EnsimeClientSocket(EnsimeCommon):
     try:
       s = socket.socket()
       s.settimeout(self.timeout)
-      # todo. even with settimeout, connect hangs Sublime if there's noone at self.port
       s.connect(("127.0.0.1", self.port))
       s.settimeout(None)
       self.socket = s
@@ -414,7 +414,8 @@ class EnsimeClientSocket(EnsimeCommon):
       return s
     except socket.error as e:
       self.connected = False
-      self.log_client("Can't connect to ENSIME server:  " + str(e.args))
+      self.log_client("Cannot connect to ENSIME server:  " + str(e.args))
+      self.status_message("Cannot connect to ENSIME server")
       self.env.controller.shutdown()
     finally:
       self._connect_lock.release()
@@ -432,8 +433,8 @@ class EnsimeClientSocket(EnsimeCommon):
     try:
       if self.socket:
         self.socket.close()
-      self.connect = False
     finally:
+      self.connected = False
       self._connect_lock.release()
 
 class EnsimeCodec:
@@ -509,13 +510,16 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     self.socket.connect()
 
   def shutdown(self):
-    self.sync_req([sym("swank:shutdown-server")])
+    if self.socket.connected:
+      self.sync_req([sym("swank:shutdown-server")])
     self.socket.close()
     self.socket = None
 
   def async_req(self, to_send, on_complete = None, call_back_into_ui_thread = None):
     if on_complete is not None and call_back_into_ui_thread is None:
-      raise "must specify a threading policy when providing a non-empty callback"
+      raise Exception("must specify a threading policy when providing a non-empty callback")
+    if not self.socket:
+      raise Exception("socket is either not yet initialized or is already destroyed")
 
     msg_id = self.next_message_id()
     self.handlers[msg_id] = (on_complete, call_back_into_ui_thread, time.time())
