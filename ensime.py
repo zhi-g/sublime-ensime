@@ -367,20 +367,21 @@ class EnsimeClientSocket(EnsimeCommon):
         msglen = self.socket.recv(6)
         if msglen:
           msglen = int(msglen, 16)
-          # self.log_client("RECV: incoming message of " + str(msglen) + " characters")
+          # self.log_client("RECV: incoming message of " + str(msglen) + " bytes")
 
           buf = ""
           while len(buf) < msglen:
             chunk = self.socket.recv(msglen - len(buf))
             if chunk:
-              # self.log_client("RECV: received a chunk of " + str(len(chunk)) + " characters")
+              # self.log_client("RECV: received a chunk of " + str(len(chunk)) + " bytes")
               buf += chunk
             else:
               raise "fatal error: recv returned None"
           self.log_client("RECV: " + buf)
 
           try:
-            form = sexp.read(buf)
+            s = buf.decode('utf-8')
+            form = sexp.read(s)
             self.notify_async_data(form)
           except:
             self.log_client("failed to parse incoming message")
@@ -528,7 +529,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
 
     self.feedback(msg_str)
     self.log_client("SEND ASYNC REQ: " + msg_str)
-    self.socket.send(msg_str)
+    self.socket.send(msg_str.encode('utf-8'))
 
   def sync_req(self, to_send):
     msg_id = self.next_message_id()
