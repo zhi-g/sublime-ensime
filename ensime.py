@@ -365,13 +365,13 @@ class EnsimeClientSocket(EnsimeCommon):
         msglen = self.socket.recv(6)
         if msglen:
           msglen = int(msglen, 16)
-          self.log_client("RECV: incoming message of " + str(msglen) + " characters")
+          # self.log_client("RECV: incoming message of " + str(msglen) + " characters")
 
           buf = ""
           while len(buf) < msglen:
             chunk = self.socket.recv(msglen - len(buf))
             if chunk:
-              self.log_client("RECV: received a chunk of " + str(len(chunk)) + " characters")
+              # self.log_client("RECV: received a chunk of " + str(len(chunk)) + " characters")
               buf += chunk
             else:
               raise "fatal error: recv returned None"
@@ -390,7 +390,8 @@ class EnsimeClientSocket(EnsimeCommon):
         self.log_client(traceback.format_exc())
         self.connected = False
         self.status_message("ENSIME server has disconnected")
-        self.env.controller.shutdown()
+        if self.env.controller:
+          self.env.controller.shutdown()
 
   def start_receiving(self):
     t = threading.Thread(name = "ensime-client-" + str(self.w.id()) + "-" + str(self.port), target = self.receive_loop)
@@ -402,15 +403,17 @@ class EnsimeClientSocket(EnsimeCommon):
     self._connect_lock.acquire()
     try:
       s = socket.socket()
+      s.settimeout(3)
+      # todo. even with settimeout, connect hangs Sublime if there's noone at self.port
       s.connect(("127.0.0.1", self.port))
+      s.settimeout(None)
       self.socket = s
       self.connected = True
       self.start_receiving()
       return s
     except socket.error as e:
-      # set sublime error status
       self.connected = False
-      self.log_client("Can't connect to ENSIME server:  " + e.args[1])
+      self.log_client("Can't connect to ENSIME server:  " + str(e.args))
       self.env.controller.shutdown()
     finally:
       self._connect_lock.release()
@@ -857,10 +860,14 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
         self.env.in_transition = True
         self.env.controller = self
         self.running = True
-        _, port_file = tempfile.mkstemp("ensime_port")
-        self.port_file = port_file
-        self.server = EnsimeServer(self.owner, port_file)
-        self.server.startup()
+        if self.env.settings.get("connect_to_external_server"):
+          self.port_file = self.env.settings.get("external_server_port_file")
+          sublime.set_timeout(functools.partial(self.request_handshake), 0)
+        else:
+          _, port_file = tempfile.mkstemp("ensime_port")
+          self.port_file = port_file
+          self.server = EnsimeServer(self.owner, port_file)
+          self.server.startup()
     except:
       self.env.controller = None
       self.running = False
