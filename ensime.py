@@ -42,6 +42,14 @@ class EnsimeApi:
     resp = self.env.controller.client.sync_req(req)
     return ensime_codec.decode_completions(resp)
 
+  def symbol_at_point(self, file_path, position, on_complete):
+    req = ensime_codec.encode_symbol_at_point(file_path, position)
+    wrapped_on_complete = functools.partial(self.symbol_at_point_on_complete_wrapper, on_complete) if on_complete else None
+    self.env.controller.client.async_req(req, wrapped_on_complete, call_back_into_ui_thread = True)
+
+  def symbol_at_point_on_complete_wrapper(self, on_complete, payload):
+    return on_complete(ensime_codec.decode_symbol_at_point(payload))
+
 envLock = threading.RLock()
 ensime_envs = {}
 
@@ -495,10 +503,7 @@ class EnsimeCodec:
     return [sym("swank:type-at-point"), str(file_path), int(position)]
 
   def decode_inspect_type_at_point(self, data):
-    if data[1] != "<notype>":
-      return "(" + str(data[7]) + ") " + data[5]
-    else:
-      return None
+    return self.decode_type(data)
 
   def encode_complete_member(self, file_path, position):
     return [sym("swank:completions"), str(file_path), int(position), 0, False]
@@ -519,6 +524,46 @@ class EnsimeCodec:
     completion.type_id = m[":type-id"]
     completion.to_insert = m[":to-insert"] if ":to-insert" in m else None
     return completion
+
+  def encode_symbol_at_point(self, file_path, position):
+    return [sym("swank:symbol-at-point"), str(file_path), int(position)]
+
+  def decode_symbol_at_point(self, data):
+    return self.decode_symbol(data)
+
+  def decode_position(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class EnsimePosition(object): pass
+    position = EnsimePosition()
+    position.file_name = m[":file"]
+    position.offset = m[":offset"]
+    return position
+
+  def decode_types(self, data):
+    if not data: return []
+    return [self.decode_type(t) for t in data]
+
+  def decode_type(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class TypeInfo(object): pass
+    info = TypeInfo()
+    info.name = m[":name"]
+    info.type_id = m[":type-id"]
+    info.full_name = m[":full-name"]
+    info.decl_as = m[":decl-as"]
+    info.decl_pos = self.decode_position(m[":pos"]) if ":pos" in m else None
+    info.type_args = self.decode_types(m[":type-args"]) if ":type-args" in m else []
+    info.outer_type_id = m[":outer-type-id"] if ":outer-type-id" in m else None
+    return info
+
+  def decode_symbol(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class SymbolInfo(object): pass
+    info = SymbolInfo()
+    info.name = m[":name"]
+    info.type = self.decode_type(m[":type"])
+    info.decl_pos = self.decode_position(m[":decl-pos"]) if ":decl-pos" in m else None
+    return info
 
 ensime_codec = EnsimeCodec()
 
@@ -1182,7 +1227,7 @@ class EnsimeHighlights(EnsimeCommon):
       bol = self.v.line(self.v.sel()[0].begin()).begin()
       eol = self.v.line(self.v.sel()[0].begin()).end()
       msgs = [note.message for note in relevant_notes if (bol <= note.start and note.start <= eol) or (bol <= note.end and note.end <= eol)]
-      statusgroup = self.env.settings.get("error_status_groupname", "ensime")
+      statusgroup = self.env.settings.get("ensime_statusbar_group", "ensime")
       if msgs:
         maxlength = self.env.settings.get("error_status_maxlength", 150)
         status = "; ".join(msgs)
@@ -1260,8 +1305,25 @@ class EnsimeInspectTypeAtPoint(ProjectFileOnly, EnsimeTextCommand):
     self.inspect_type_at_point(self.f, self.v.sel()[0].begin(), self.handle_reply)
 
   def handle_reply(self, tpe):
-    statusgroup = self.env.settings.get("type_status_groupname", "ensime")
-    if tpe:
-      self.v.set_status(statusgroup, tpe)
+    statusgroup = self.env.settings.get("ensime_statusbar_group", "ensime")
+    if tpe.name != "<notype>":
+      # summary = "(" + str(tpe.decl_as) + ") " + tpe.full_name
+      summary = tpe.full_name
+      if tpe.type_args:
+        summary += ("[" + ", ".join(map(lambda t: t.name, tpe.type_args)) + "]")
+      self.v.set_status(statusgroup, summary)
     else:
       self.v.set_status(statusgroup, "type is unknown")
+
+class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
+  def run(self, edit):
+    self.symbol_at_point(self.f, self.v.sel()[0].begin(), self.handle_reply)
+
+  def handle_reply(self, info):
+    statusgroup = self.env.settings.get("ensime_statusbar_group", "ensime")
+    if info.decl_pos:
+      v = self.w.open_file(info.decl_pos.file_name)
+      v.sel().clear()
+      v.sel().add(Region(info.decl_pos.offset, info.decl_pos.offset))
+    else:
+      self.v.set_status(statusgroup, "destination is unknown")

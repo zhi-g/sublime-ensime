@@ -24,5 +24,9 @@
   {
     "caption": "Ensime: Inspect Type at Point",
     "command": "ensime_inspect_type_at_point"
+  },
+  {
+    "caption": "Ensime: Go to Definition",
+    "command": "ensime_go_to_definition"
   }
 ]
