@@ -9,6 +9,7 @@
   "error_status": true,
   "error_status_maxlength": 150,
   "error_status_groupname": "ensime",
+  "type_status_groupname": "ensime",
 
   // debug settings
   "log_to_console": ["ui", "client", "server"],

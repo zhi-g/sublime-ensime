@@ -11,7 +11,11 @@ class EnsimeApi:
 
   def type_check_file(self, file_path, on_complete = None):
     req = ensime_codec.encode_type_check_file(file_path)
-    self.env.controller.client.async_req(req, on_complete, call_back_into_ui_thread = True)
+    wrapped_on_complete = functools.partial(self.type_check_file_on_complete_wrapper, on_complete) if on_complete else None
+    self.env.controller.client.async_req(req, wrapped_on_complete, call_back_into_ui_thread = True)
+
+  def type_check_file_on_complete_wrapper(self, on_complete, payload):
+    return on_complete(ensime_codec.decode_type_check_file(resp))
 
   def add_notes(self, notes):
     self.env.notes += notes
@@ -27,7 +31,11 @@ class EnsimeApi:
 
   def inspect_type_at_point(self, file_path, position, on_complete):
     req = ensime_codec.encode_inspect_type_at_point(file_path, position)
-    self.env.controller.client.async_req(req, on_complete, call_back_into_ui_thread = True)
+    wrapped_on_complete = functools.partial(self.inspect_type_at_point_on_complete_wrapper, on_complete) if on_complete else None
+    self.env.controller.client.async_req(req, wrapped_on_complete, call_back_into_ui_thread = True)
+
+  def inspect_type_at_point_on_complete_wrapper(self, on_complete, payload):
+    return on_complete(ensime_codec.decode_inspect_type_at_point(payload))
 
   def complete_member(self, file_path, position):
     req = ensime_codec.encode_complete_member(file_path, position)
@@ -333,6 +341,10 @@ class ConnectedEnsimeOnly:
   def is_enabled(self):
     return not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.connected
 
+class ProjectFileOnly:
+  def is_enabled(self):
+    return not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.connected and self.in_project(self.v.file_name())
+
 class EnsimeContextProvider(EventListener):
   def on_query_context(self, view, key, operator, operand, match_all):
     if key == "ensime_ready":
@@ -459,6 +471,9 @@ class EnsimeCodec:
   def encode_type_check_file(self, file_path):
     return [sym("swank:typecheck-file"), file_path]
 
+  def decode_type_check_file(self, data):
+    return True
+
   def decode_notes(self, data):
     m = sexp.sexp_to_key_map(data)
     return [self.decode_note(n) for n in m[":notes"]]
@@ -480,9 +495,8 @@ class EnsimeCodec:
     return [sym("swank:type-at-point"), str(file_path), int(position)]
 
   def decode_inspect_type_at_point(self, data):
-    d = data[1][1]
-    if d[1] != "<notype>":
-      return "(" + str(d[7]) + ") " + d[5]
+    if data[1] != "<notype>":
+      return "(" + str(data[7]) + ") " + data[5]
     else:
       return None
 
@@ -1184,12 +1198,7 @@ class EnsimeHighlights(EnsimeCommon):
     else:
       self.hide()
 
-class EnsimeHighlightCommand(ConnectedEnsimeOnly, EnsimeWindowCommand):
-  def is_enabled(self, enable = True):
-    now = not not self.env.settings.get("error_highlight")
-    wannabe = not not enable
-    return super(EnsimeHighlightCommand, self).is_enabled() and now != wannabe
-
+class EnsimeHighlightCommand(ProjectFileOnly, EnsimeWindowCommand):
   def run(self, enable = True):
     self.env.settings.set("error_highlight", not not enable)
     sublime.save_settings("Ensime.sublime-settings")
@@ -1198,12 +1207,14 @@ class EnsimeHighlightCommand(ConnectedEnsimeOnly, EnsimeWindowCommand):
       self.type_check_file(self.f)
 
 class EnsimeShowNotesCommand(ConnectedEnsimeOnly, EnsimeTextCommand):
-  def run(self, edit):
+  def run(self, edit, current_file_only):
     v = self.v.window().new_file()
     v.set_scratch(True)
-    designator = " for " + os.path.basename(self.v.file_name())
+    designator = " for " + os.path.basename(self.v.file_name()) if current_file_only else ""
     v.set_name("Ensime notes" + designator)
-    relevant_notes = filter(lambda note: self.same_files(note.file_name, self.v.file_name()), self.env.notes)
+    relevant_notes = self.env.notes
+    if current_file_only:
+      relevant_notes = filter(lambda note: self.same_files(note.file_name, self.v.file_name()), self.env.notes)
     errors = [self.v.full_line(note.start) for note in relevant_notes]
     edit = v.begin_edit()
     relevant_notes = filter(lambda note: self.same_files(note.file_name, self.v.file_name()), self.env.notes)
@@ -1244,12 +1255,13 @@ class EnsimeCompletionsListener(EventListener):
     if completions is None: return []
     return ([(c.name + "\t" + c.signature, c.name) for c in completions], sublime.INHIBIT_EXPLICIT_COMPLETIONS | sublime.INHIBIT_WORD_COMPLETIONS)
 
-class EnsimeInspectTypeAtPoint(ConnectedEnsimeOnly, EnsimeTextCommand):
+class EnsimeInspectTypeAtPoint(ProjectFileOnly, EnsimeTextCommand):
   def run(self, edit):
     self.inspect_type_at_point(self.f, self.v.sel()[0].begin(), self.handle_reply)
 
   def handle_reply(self, tpe):
+    statusgroup = self.env.settings.get("type_status_groupname", "ensime")
     if tpe:
-      self.v.set_status("ensime-typer", tpe)
+      self.v.set_status(statusgroup, tpe)
     else:
-      self.v.erase_status("ensime-typer")
+      self.v.set_status(statusgroup, "type is unknown")
