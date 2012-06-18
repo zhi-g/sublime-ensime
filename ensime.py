@@ -270,11 +270,25 @@ class EnsimeBase(object):
     else:
       raise "unsupported owner of type: " + str(type(owner))
 
+  def same_files(self, filename1, filename2):
+    if not filename1 or not filename2:
+      return False
+    filename1_normalized = os.path.normcase(os.path.realpath(filename1))
+    filename2_normalized = os.path.normcase(os.path.realpath(filename2))
+    return filename1 == filename2
+
   def in_project(self, filename):
     if filename and filename.endswith("scala"):
       root = os.path.normcase(os.path.realpath(self.env.project_root))
       wannabe = os.path.normcase(os.path.realpath(filename))
       return wannabe.startswith(root)
+
+  def project_relative_path(self, filename):
+    if not self.in_project(filename):
+      return None
+    root = os.path.realpath(self.env.project_root)
+    wannabe = os.path.realpath(filename)
+    return wannabe[len(root) + 1:]
 
 class EnsimeCommon(EnsimeBase, EnsimeLog, EnsimeApi):
   pass
@@ -869,8 +883,14 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
         self.env.in_transition = True
         self.env.controller = self
         self.running = True
-        if self.env.settings.get("connect_to_external_server"):
+        if self.env.settings.get("connect_to_external_server", False):
           self.port_file = self.env.settings.get("external_server_port_file")
+          if not self.port_file:
+            message = "\"connect_to_external_server\" in your Ensime.sublime-settings is set to true, "
+            message += "however \"external_server_port_file\" is not specified. "
+            message += "Please, set it to a meaningful value and restart ENSIME."
+            sublime.set_timeout(functools.partial(sublime.error_message, message), 0)
+            raise Exception("external_server_port_file not specified")
           sublime.set_timeout(functools.partial(self.request_handshake), 0)
         else:
           _, port_file = tempfile.mkstemp("ensime_port")
@@ -1126,9 +1146,8 @@ class EnsimeHighlights(EnsimeCommon):
     self.v.erase_regions("ensime-error-underline")
 
   def show(self):
-    # filter notes against self.f
-    # don't forget to use os.realpath to defeat symlinks
-    errors = [self.v.full_line(note.start) for note in self.env.notes]
+    relevant_notes = filter(lambda note: self.same_files(note.file_name, self.v.file_name()), self.env.notes)
+    errors = [self.v.full_line(note.start) for note in relevant_notes]
     underlines = []
     for note in self.env.notes:
       underlines += [sublime.Region(int(pos)) for pos in range(note.start, note.end)]
@@ -1143,8 +1162,21 @@ class EnsimeHighlights(EnsimeCommon):
         "ensime-error",
         errors,
         "invalid.illegal",
-        self.env.settings.get("error_icon"),
+        self.env.settings.get("error_icon", "dot"),
         sublime.DRAW_OUTLINED)
+    if self.env.settings.get("error_status"):
+      bol = self.v.line(self.v.sel()[0].begin()).begin()
+      eol = self.v.line(self.v.sel()[0].begin()).end()
+      msgs = [note.message for note in relevant_notes if (bol <= note.start and note.start <= eol) or (bol <= note.end and note.end <= eol)]
+      statusgroup = self.env.settings.get("error_status_groupname", "ensime")
+      if msgs:
+        maxlength = self.env.settings.get("error_status_maxlength", 150)
+        status = "; ".join(msgs)
+        if len(status) > maxlength:
+          status = status[0:maxlength] + "..."
+        self.v.set_status(statusgroup, status)
+      else:
+        self.v.erase_status(statusgroup)
 
   def refresh(self):
     if self.env.settings.get("error_highlight"):
@@ -1165,6 +1197,27 @@ class EnsimeHighlightCommand(ConnectedEnsimeOnly, EnsimeWindowCommand):
     if enable:
       self.type_check_file(self.f)
 
+class EnsimeShowNotesCommand(ConnectedEnsimeOnly, EnsimeTextCommand):
+  def run(self, edit):
+    v = self.v.window().new_file()
+    v.set_scratch(True)
+    designator = " for " + os.path.basename(self.v.file_name())
+    v.set_name("Ensime notes" + designator)
+    relevant_notes = filter(lambda note: self.same_files(note.file_name, self.v.file_name()), self.env.notes)
+    errors = [self.v.full_line(note.start) for note in relevant_notes]
+    edit = v.begin_edit()
+    relevant_notes = filter(lambda note: self.same_files(note.file_name, self.v.file_name()), self.env.notes)
+    for note in relevant_notes:
+      loc = self.project_relative_path(note.file_name) + ":" + str(note.line)
+      severity = note.severity
+      message = note.message
+      diagnostics = ": ".join(str(x) for x in [loc, severity, message])
+      v.insert(edit, v.size(), diagnostics + "\n")
+      v.insert(edit, v.size(), self.v.substr(self.v.full_line(note.start)))
+      v.insert(edit, v.size(), " " * (note.col - 1) + "^" + "\n")
+    v.sel().clear()
+    v.sel().add(Region(0, 0))
+
 class EnsimeHighlightDaemon(EventListener):
   def with_api(self, view, what):
     api = ensime_api(view)
@@ -1181,18 +1234,7 @@ class EnsimeHighlightDaemon(EventListener):
     self.with_api(view, lambda api: EnsimeHighlights(view).refresh())
 
   def on_selection_modified(self, view):
-    self.with_api(view, self.display_errors_in_statusbar)
-
-  def display_errors_in_statusbar(self, api):
-    bol = api.v.line(api.v.sel()[0].begin()).begin()
-    eol = api.v.line(api.v.sel()[0].begin()).end()
-    # filter notes against self.f
-    # don't forget to use os.realpath to defeat symlinks
-    msgs = [note.message for note in api.env.notes if (bol <= note.start and note.start <= eol) or (bol <= note.end and note.end <= eol)]
-    if msgs:
-      api.v.set_status("ensime-typer", "; ".join(msgs))
-    else:
-      api.v.erase_status("ensime-typer")
+    self.with_api(view, lambda api: EnsimeHighlights(view).refresh())
 
 class EnsimeCompletionsListener(EventListener):
   def on_query_completions(self, view, prefix, locations):

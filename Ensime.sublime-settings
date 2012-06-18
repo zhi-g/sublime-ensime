@@ -5,7 +5,10 @@
   // stylistic settings
   "error_highlight": true,
   "error_underline": true,
-  "error_icon": "cross",
+  "error_icon": "dot",
+  "error_status": true,
+  "error_status_maxlength": 150,
+  "error_status_groupname": "ensime",
 
   // debug settings
   "log_to_console": ["ui", "client", "server"],
