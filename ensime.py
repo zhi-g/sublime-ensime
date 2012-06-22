@@ -551,7 +551,7 @@ class EnsimeCodec:
     info = TypeInfo()
     info.name = m[":name"]
     info.type_id = m[":type-id"]
-    info.full_name = m[":full-name"]
+    info.full_name = m[":full-name"] if ":full-name" in m else None
     info.decl_as = m[":decl-as"] if ":decl-as" in m else None
     info.decl_pos = self.decode_position(m[":pos"]) if ":pos" in m else None
     info.type_args = self.decode_types(m[":type-args"]) if ":type-args" in m else []
