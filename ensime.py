@@ -1235,7 +1235,7 @@ class EnsimeHighlights(EnsimeCommon):
         status = "; ".join(msgs)
         if len(status) > maxlength:
           status = status[0:maxlength] + "..."
-        self.v.set_status(statusgroup, status)
+        sublime.set_timeout(functools.partial(self.v.set_status, statusgroup, status), 100)
       else:
         self.v.erase_status(statusgroup)
 
@@ -1331,7 +1331,7 @@ class EnsimeCtrlClick(EnsimeTextCommand):
       self.v.settings().set("prev_sel", s_prev)
       self.v.settings().set("curr_sel", str(self.v.sel()))
       self.v.run_command("ensime_go_to_definition", {"target": target})
-      sublime.set_timeout(self.trigger_selection_update, 50)
+      sublime.set_timeout(self.trigger_selection_update, 100)
     else:
       # additive drag_select has been applied before this command was called
       # hence we have nothing to do here
@@ -1375,10 +1375,10 @@ class EnsimeInspectTypeAtPoint(ProjectFileOnly, EnsimeTextCommand):
       summary = tpe.full_name
       if tpe.type_args:
         summary += ("[" + ", ".join(map(lambda t: t.name, tpe.type_args)) + "]")
-      self.v.set_status(statusgroup, summary)
+      sublime.set_timeout(functools.partial(self.v.set_status, statusgroup, summary), 100)
     else:
       statusmessage = "Type of the expression at cursor is unknown"
-      sublime.set_timeout(functools.partial(self.v.set_status, statusgroup, statusmessage), 50)
+      sublime.set_timeout(functools.partial(self.v.set_status, statusgroup, statusmessage), 100)
 
 class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
   def run(self, edit, target= None):
@@ -1395,4 +1395,4 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
       v.sel().add(Region(info.decl_pos.offset, info.decl_pos.offset))
     else:
       statusmessage = "Definition of " + str(info.name) + " cannot be found"
-      sublime.set_timeout(functools.partial(self.v.set_status, statusgroup, statusmessage), 50)
+      sublime.set_timeout(functools.partial(self.v.set_status, statusgroup, statusmessage), 100)
