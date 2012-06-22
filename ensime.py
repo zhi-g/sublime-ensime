@@ -1349,6 +1349,16 @@ class EnsimeCtrlClick(EnsimeTextCommand):
   def diff(self, sel1, sel2):
     return list((set(sel1) - set(sel2)) | (set(sel2) - set(sel1)))
 
+class EnsimeAltClick(EnsimeTextCommand):
+  def run(self, edit):
+    is_applicable = not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.connected and self.in_project(self.v.file_name())
+    if is_applicable and self.env.settings.get("alt_click_inspects_type_at_point"):
+      self.v.run_command("ensime_inspect_type_at_point", {"target": self.v.sel()[0]})
+    else:
+      # subtractive drag_select has been applied before this command was called
+      # hence we have nothing to do here
+      pass
+
 class EnsimeCtrlTilde(EnsimeWindowCommand):
   def run(self):
     if self.env.settings.get("ctrl_tilde_shows_repl"):
