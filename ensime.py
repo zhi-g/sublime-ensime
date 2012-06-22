@@ -1034,7 +1034,7 @@ class EnsimeShutdownCommand(RunningOnly, EnsimeWindowCommand):
 class EnsimeRestartCommand(RunningOnly, EnsimeWindowCommand):
   def run(self):
     self.w.run_command("ensime_shutdown")
-    self.w.run_command("ensime_startup")
+    sublime.set_timeout(functools.partial(self.w.run_command, "ensime_startup"), 100)
 
 class EnsimeShowClientMessagesCommand(EnsimeWindowCommand):
   def run(self):
