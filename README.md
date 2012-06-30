@@ -1,8 +1,14 @@
 # Sublime ENSIME
 
-This project provides an integration with ENSIME and Sublime Text Editor 2.
-Big thanks to Aemon Cannon, Daniel Spiewak, Ivan Porto Carrero and Michael Nash,
-whose work and inspiration helped to kicked off this project.
+This project provides integration with ENSIME and Sublime Text Editor 2.
+It's a fork of the original sublime-ensime project, written by Ivan Porto Carrero.
+This fork introduces stability improvements, user-friendly setup and error messages,
+better logging and works with the latest pre-release version of Scala 2.10.
+
+Sublime ENSIME strives to realize the dream of having Scala semantic services
+inside a lightning fast and feature-rich text editor. Big thanks to Aemon Cannon, 
+Daniel Spiewak and Ivan Porto Carrero who demonstrated that this vision is possible
+and inspired us to kick off the project.
 
 ## How to install?
 
