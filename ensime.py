@@ -977,8 +977,24 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
 
   def response_handshake(self, server_info):
     self.status_message("Initializing... ")
-    req = ensime_codec.encode_initialize_project(self.env.project_config)
-    self.client.async_req(req, lambda _: self.status_message("Ensime ready!"), call_back_into_ui_thread = True)
+    conf = self.env.project_config
+    m = sexp.sexp_to_key_map(conf)
+    subprojects = [sexp.sexp_to_key_map(p) for p in m.get(":subprojects",[])]
+    names = [p[":name"] for p in subprojects]
+
+    # TODO(aemoncannon)
+    # Prompt user for project.
+    name = None
+    if names:
+      name = names[0]
+    conf = conf + [key(":active-subproject"), name]
+
+    req = ensime_codec.encode_initialize_project(conf)
+    self.client.async_req(
+      req,
+      lambda _: self.status_message("Continuing to init project..."),
+      call_back_into_ui_thread = True)
+
 
   def shutdown(self):
     self.env.lifecycleLock.acquire()
