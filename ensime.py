@@ -39,9 +39,9 @@ class EnsimeApi:
   def inspect_type_at_point_on_complete_wrapper(self, on_complete, payload):
     return on_complete(ensime_codec.decode_inspect_type_at_point(payload))
 
-  def complete_member(self, file_path, position):
-    req = ensime_codec.encode_complete_member(file_path, position)
-    resp = self.env.controller.client.sync_req(req)
+  def get_completions(self, file_path, position):
+    req = ensime_codec.encode_completions(file_path, position)
+    resp = self.env.controller.client.sync_req(req, timeout=0.01)
     return ensime_codec.decode_completions(resp)
 
   def symbol_at_point(self, file_path, position, on_complete):
@@ -495,8 +495,8 @@ class EnsimeCodec:
   def decode_inspect_type_at_point(self, data):
     return self.decode_type(data)
 
-  def encode_complete_member(self, file_path, position):
-    return [sym("swank:completions"), str(file_path), int(position), 0, False]
+  def encode_completions(self, file_path, position):
+    return [sym("swank:completions"), str(file_path), int(position), 30, False]
 
   def decode_completions(self, data):
     if not data: return []
@@ -594,7 +594,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     self.log_client("SEND ASYNC REQ: " + msg_str)
     self.socket.send(msg_str.encode('utf-8'))
 
-  def sync_req(self, to_send):
+  def sync_req(self, to_send, timeout=0):
     msg_id = self.next_message_id()
     event = threading.Event()
     self.handlers[msg_id] = (event, None, time.time())
@@ -605,11 +605,14 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     self.log_client("SEND SYNC REQ: " + msg_str)
     self.socket.send(msg_str)
 
-    event.wait(self.timeout)
+    max_wait = timeout or self.timeout
+    event.wait(max_wait)
     if hasattr(event, "payload"):
       return event.payload
     else:
-      self.log_client("sync_req #" + str(msg_id) + " has timed out (didn't get a response after " + str(self.timeout) + " seconds)")
+      self.log_client("sync_req #" + str(msg_id) +
+                      " has timed out (didn't get a response after " +
+                      str(max_wait) + " seconds)")
       return None
 
   def on_client_async_data(self, data):
@@ -1397,9 +1400,11 @@ class EnsimeCompletionsListener(EventListener):
   def on_query_completions(self, view, prefix, locations):
     if not view.match_selector(locations[0], "source.scala"): return []
     api = ensime_api(view)
-    completions = api.complete_member(view.file_name(), locations[0]) if api else None
+    completions = api.get_completions(view.file_name(), locations[0]) if api else None
     if completions is None: return []
-    return ([(c.name + "\t" + c.signature, c.name) for c in completions], sublime.INHIBIT_EXPLICIT_COMPLETIONS | sublime.INHIBIT_WORD_COMPLETIONS)
+    return ([(c.name + "\t" + c.signature, c.name) for c in completions],
+            sublime.INHIBIT_EXPLICIT_COMPLETIONS |
+            sublime.INHIBIT_WORD_COMPLETIONS)
 
 class EnsimeInspectTypeAtPoint(ProjectFileOnly, EnsimeTextCommand):
   def run(self, edit, target= None):
