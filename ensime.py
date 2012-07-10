@@ -23,15 +23,13 @@ class EnsimeApi:
 
   def add_notes(self, notes):
     self.env.notes += notes
-    for i in range(0, self.w.num_groups()):
-      v = self.w.active_view_in_group(i)
-      EnsimeHighlights(v).refresh()
+    for v in self.w.views():
+      EnsimeHighlights(v).add(notes)
 
   def clear_notes(self):
     self.env.notes = []
-    for i in range(0, self.w.num_groups()):
-      v = self.w.active_view_in_group(i)
-      EnsimeHighlights(v).refresh()
+    for v in self.w.views():
+      EnsimeHighlights(v).clear_all()
 
   def inspect_type_at_point(self, file_path, position, on_complete):
     req = ensime_codec.encode_inspect_type_at_point(file_path, position)
@@ -266,12 +264,12 @@ class EnsimeBase(object):
     env.environment_constructor = environment_constructor
     self.owner = owner
     if type(owner) == Window:
-      self.env = get_ensime_env(owner)
+      self.env = env.for_window(owner)
       self.w = owner
       self.v = owner.active_view()
       self.f = None
     elif type(owner) == View:
-      self.env = get_ensime_env(owner.window() or sublime.active_window())
+      self.env = env.for_window(owner.window() or sublime.active_window())
       self.w = owner.window()
       self.v = owner
       self.f = owner.file_name()
@@ -1216,33 +1214,52 @@ class EnsimeReplNextCommand(EnsimeTextCommand):
     self.repl_show()
 
 class EnsimeHighlights(EnsimeCommon):
-  def hide(self):
+
+  def refresh(self):
+    self.clear_all()
+    self.add(self.env.notes)
+
+  def clear_all(self):
     self.v.erase_regions("ensime-error")
     self.v.erase_regions("ensime-error-underline")
 
-  def show(self):
-    relevant_notes = filter(lambda note: self.same_files(note.file_name, self.v.file_name()), self.env.notes)
-    errors = [self.v.full_line(note.start) for note in relevant_notes]
-    underlines = []
-    for note in self.env.notes:
-      underlines += [sublime.Region(int(pos)) for pos in range(note.start, note.end)]
+  def add(self, notes):
+    relevant_notes = filter(
+      lambda note: self.same_files(note.file_name, self.v.file_name()), notes)
+
+    # Underline specific error range
+    underlines = [sublime.Region(note.start, note.end) for note in relevant_notes]
     if self.env.settings.get("error_highlight") and self.env.settings.get("error_underline"):
       self.v.add_regions(
         "ensime-error-underline",
-        underlines,
+        underlines + self.v.get_regions("ensime-error-underline"),
         "invalid.illegal",
         sublime.DRAW_EMPTY_AS_OVERWRITE)
+
+    # Outline entire errored line
+    errors = [self.v.full_line(note.start) for note in relevant_notes]
     if self.env.settings.get("error_highlight"):
       self.v.add_regions(
         "ensime-error",
-        errors,
+        errors + self.v.get_regions("ensime-error"),
         "invalid.illegal",
         self.env.settings.get("error_icon", "dot"),
         sublime.DRAW_OUTLINED)
+
+
+class EnsimeHighlightStatus(EnsimeCommon):
+
+  def refresh(self):
     if self.env.settings.get("error_status"):
+      relevant_notes = filter(
+        lambda note: self.same_files(
+          note.file_name, self.v.file_name()),
+        self.env.notes)
       bol = self.v.line(self.v.sel()[0].begin()).begin()
       eol = self.v.line(self.v.sel()[0].begin()).end()
-      msgs = [note.message for note in relevant_notes if (bol <= note.start and note.start <= eol) or (bol <= note.end and note.end <= eol)]
+      msgs = [note.message for note in relevant_notes
+              if (bol <= note.start and note.start <= eol) or
+              (bol <= note.end and note.end <= eol)]
       statusgroup = self.env.settings.get("ensime_statusbar_group", "ensime")
       if msgs:
         maxlength = self.env.settings.get("error_status_maxlength", 150)
@@ -1253,11 +1270,6 @@ class EnsimeHighlights(EnsimeCommon):
       else:
         self.v.erase_status(statusgroup)
 
-  def refresh(self):
-    if self.env.settings.get("error_highlight"):
-      self.show()
-    else:
-      self.hide()
 
 class EnsimeHighlightCommand(ProjectFileOnly, EnsimeWindowCommand):
   def run(self, enable = True):
@@ -1307,7 +1319,7 @@ class EnsimeHighlightDaemon(EventListener):
 
   def on_selection_modified(self, view):
     if view.sel():
-      self.with_api(view, lambda api: EnsimeHighlights(view).refresh())
+      self.with_api(view, lambda api: EnsimeHighlightStatus(view).refresh())
 
 # things might be simplified as per http://www.sublimetext.com/forum/viewtopic.php?f=6&t=7658
 class EnsimeCtrlClickDaemon(EventListener):
