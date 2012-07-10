@@ -6,6 +6,10 @@ import functools, inspect, traceback, random, re
 from sexp import sexp
 from sexp.sexp import key, sym
 from string import strip
+import env
+
+def environment_constructor(window):
+  return EnsimeEnvironment(window)
 
 class EnsimeApi:
 
@@ -50,21 +54,6 @@ class EnsimeApi:
   def symbol_at_point_on_complete_wrapper(self, on_complete, payload):
     return on_complete(ensime_codec.decode_symbol_at_point(payload))
 
-envLock = threading.RLock()
-ensime_envs = {}
-
-def get_ensime_env(window):
-  if window:
-    if window.id() in ensime_envs:
-      return ensime_envs[window.id()]
-    envLock.acquire()
-    try:
-      if not (window.id() in ensime_envs):
-        ensime_envs[window.id()] = EnsimeEnvironment(window)
-      return ensime_envs[window.id()]
-    finally:
-      envLock.release()
-  return None
 
 class EnsimeEnvironment(object):
   def __init__(self, window):
@@ -274,6 +263,7 @@ class EnsimeLog(object):
 
 class EnsimeBase(object):
   def __init__(self, owner):
+    env.environment_constructor = environment_constructor
     self.owner = owner
     if type(owner) == Window:
       self.env = get_ensime_env(owner)
