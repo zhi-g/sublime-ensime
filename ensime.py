@@ -41,7 +41,7 @@ class EnsimeApi:
 
   def get_completions(self, file_path, position):
     req = ensime_codec.encode_completions(file_path, position)
-    resp = self.env.controller.client.sync_req(req, timeout=0.01)
+    resp = self.env.controller.client.sync_req(req, timeout=0.5)
     return ensime_codec.decode_completions(resp)
 
   def symbol_at_point(self, file_path, position, on_complete):
@@ -500,9 +500,8 @@ class EnsimeCodec:
 
   def decode_completions(self, data):
     if not data: return []
-    friend = sexp.sexp_to_key_map(data)
-    comps = friend[":completions"] if ":completions" in friend else []
-    return [self.decode_completion(p) for p in friend[":completions"]]
+    m = sexp.sexp_to_key_map(data)
+    return [self.decode_completion(p) for p in m.get(":completions", [])]
 
   def decode_completion(self, data):
     m = sexp.sexp_to_key_map(data)
@@ -745,7 +744,6 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
   def feedback(self, msg):
     msg = msg.replace("\r\n", "\n").replace("\r", "\n") + "\n"
     self.log_client(msg.strip(), to_disk_only = True)
-    self.view_insert(self.env.cv, msg)
 
 class EnsimeServerListener:
   def on_server_data(self, data):
@@ -915,12 +913,10 @@ class EnsimeServer(EnsimeServerListener, EnsimeCommon):
   def on_server_data(self, data):
     str_data = str(data).replace("\r\n", "\n").replace("\r", "\n")
     self.log_server(str_data.strip(), to_disk_only = True)
-    self.view_insert(self.env.sv, str_data)
 
   def shutdown(self):
     self.proc.kill()
     self.proc = None
-    self.view_insert(self.env.sv, "[Shut down]")
 
 class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener):
   def __init__(self, owner):
