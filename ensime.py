@@ -8,7 +8,7 @@ from sexp import sexp
 from sexp.sexp import key, sym
 from string import strip
 import env
-import config
+import dotensime
 
 def environment_constructor(window):
   return EnsimeEnvironment(window)
@@ -75,7 +75,7 @@ class EnsimeEnvironment(object):
     self.log_root = os.path.normpath(os.path.join(self.plugin_root, "logs"))
 
     # instance-specific stuff (immutable)
-    (root, conf) = config.load(window)
+    (root, conf) = dotensime.load(window)
     self.project_root = root
     self.project_config = conf
     self.valid = self.project_config != None
@@ -112,25 +112,28 @@ class EnsimeLog(object):
   def error_message(self, msg):
     sublime.set_timeout(functools.partial(sublime.error_message, msg), 0)
 
-  def log(self, data, to_disk_only = False):
-    sublime.set_timeout(functools.partial(self.log_on_ui_thread, "ui", data, to_disk_only), 0)
+  def log(self, data):
+    sublime.set_timeout(functools.partial(self.log_on_ui_thread, "ui", data), 0)
 
-  def log_client(self, data, to_disk_only = False):
-    sublime.set_timeout(functools.partial(self.log_on_ui_thread, "client", data, to_disk_only), 0)
+  def log_client(self, data):
+    sublime.set_timeout(functools.partial(self.log_on_ui_thread, "client", data), 0)
 
-  def log_server(self, data, to_disk_only = False):
-    sublime.set_timeout(functools.partial(self.log_on_ui_thread, "server", data, to_disk_only), 0)
+  def log_server(self, data):
+    sublime.set_timeout(functools.partial(self.log_on_ui_thread, "server", data), 0)
 
-  def log_on_ui_thread(self, flavor, data, to_disk_only):
+  def log_on_ui_thread(self, flavor, data):
     if flavor in self.env.settings.get("log_to_console", {}):
-      if not to_disk_only:
-        print str(data)
+      if flavor == "client":
+        self.view_insert(self.env.cv, str(data))
+      if flavor == "server":
+        self.view_insert(self.env.sv, str(data))
+      print str(data)
     if flavor in self.env.settings.get("log_to_file", {}):
       try:
         if not os.path.exists(self.env.log_root):
           os.mkdir(self.env.log_root)
         file_name = os.path.join(self.env.log_root, flavor + ".log")
-        with open(file_name, "a") as f: f.write(data + "\n")
+        with open(file_name, "a") as f: f.write(data.strip() + "\n")
       except:
         pass
 
@@ -744,7 +747,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
 
   def feedback(self, msg):
     msg = msg.replace("\r\n", "\n").replace("\r", "\n") + "\n"
-    self.log_client(msg.strip(), to_disk_only = True)
+    self.log_client(msg)
 
 class EnsimeServerListener:
   def on_server_data(self, data):
@@ -913,7 +916,7 @@ class EnsimeServer(EnsimeServerListener, EnsimeCommon):
 
   def on_server_data(self, data):
     str_data = str(data).replace("\r\n", "\n").replace("\r", "\n")
-    self.log_server(str_data.strip(), to_disk_only = True)
+    self.log_server(str_data)
 
   def shutdown(self):
     self.proc.kill()
@@ -977,12 +980,13 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
 
   def __response_handshake(self, server_info):
     self.status_message("Initializing... ")
-    config.select_subproject(self.env.project_config,
-                             self.owner,
-                             self.__initialize)
+    dotensime.select_subproject(self.env.project_config,
+                                self.owner,
+                                self.__initialize)
 
   def __initialize(self, subproject_name):
-    self.status_message("Starting subproject: " + str(subproject_name))
+    if subproject_name:
+      self.status_message("Starting subproject: " + str(subproject_name))
     conf = self.env.project_config + [key(":active-subproject"), subproject_name]
     req = ensime_codec.encode_initialize_project(conf)
     self.client.async_req(

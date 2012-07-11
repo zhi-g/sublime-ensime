@@ -26,9 +26,6 @@ def load(window):
     else:
       conf = conf + [key(":root-dir"), root]
     return (root, conf)
-
-  sublime.error_message(
-      "Couldn't find a .ensime file at the root of your project.")
   return (None, None)
 
 def select_subproject(conf, window, on_complete):
