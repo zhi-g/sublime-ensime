@@ -182,8 +182,6 @@ def atom_to_str(exp):
     return "nil"
   elif isinstance(exp, basestring):
     return "\"" + exp.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
-  elif isinstance(exp, (int, long)):
-    return str(exp)
   else:
     return str(exp)
 
