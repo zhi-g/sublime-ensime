@@ -69,3 +69,4 @@ if __name__ == "__main__":
   assert len(diff("abc", "qqqqqbc")) == 1
   assert len(diff("abc", "")) == 1
   assert len(diff("abc\n   def", "abc   def")) == 1
+  assert len(diff("", "abcdef")) == 1
