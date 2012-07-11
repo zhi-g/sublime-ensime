@@ -1,12 +1,14 @@
 import sublime
 from sublime import *
 from sublime_plugin import *
-import os, threading, thread, socket, getpass, subprocess, killableprocess, tempfile, datetime, time
+import os, threading, thread, socket, getpass
+import subprocess, killableprocess, tempfile, datetime, time
 import functools, inspect, traceback, random, re
 from sexp import sexp
 from sexp.sexp import key, sym
 from string import strip
 import env
+import config
 
 def environment_constructor(window):
   return EnsimeEnvironment(window)
@@ -57,28 +59,26 @@ class EnsimeEnvironment(object):
   def __init__(self, window):
     # plugin-wide stuff (immutable)
     self.settings = sublime.load_settings("Ensime.sublime-settings")
-    server_dir = self.settings.get("ensime_server_path", "sublime_ensime\\server" if os.name == 'nt' else "sublime_ensime/server")
-    self.server_path = server_dir if server_dir.startswith("/") or (":/" in server_dir) or (":\\" in server_dir) else os.path.join(sublime.packages_path(), server_dir)
-    self.ensime_executable = self.server_path + '/' + ("bin\\server.bat" if os.name == 'nt' else "bin/server")
+    server_dir = self.settings.get(
+      "ensime_server_path",
+      "sublime_ensime\\server"
+      if os.name == 'nt' else "sublime_ensime/server")
+    self.server_path = (server_dir
+                        if (server_dir.startswith("/") or
+                            (":/" in server_dir) or
+                            (":\\" in server_dir))
+                        else os.path.join(sublime.packages_path(), server_dir))
+    self.ensime_executable = (self.server_path + '/' +
+                              ("bin\\server.bat" if os.name == 'nt'
+                               else "bin/server"))
     self.plugin_root = os.path.normpath(os.path.join(self.server_path, ".."))
     self.log_root = os.path.normpath(os.path.join(self.plugin_root, "logs"))
 
     # instance-specific stuff (immutable)
-    self.project_root = None
-    self.project_file = None
-    self.project_config = []
-    prj_files = [(f + "/.ensime") for f in window.folders() if os.path.exists(f + "/.ensime")]
-    if len(prj_files) > 0:
-      self.project_file = prj_files[0]
-      self.project_root = os.path.dirname(self.project_file)
-      src = open(self.project_file).read() if self.project_file else "()"
-      self.project_config = sexp.read(src)
-      m = sexp.sexp_to_key_map(self.project_config)
-      if m.get(":root-dir"):
-        self.project_root = m[":root-dir"]
-      else:
-        self.project_config = self.project_config + [key(":root-dir"), self.project_root]
-    self.valid = self.project_config
+    (root, conf) = config.load(window)
+    self.project_root = root
+    self.project_config = conf
+    self.valid = self.project_config != None
 
     # lifecycle (mutable)
     self.lifecycleLock = threading.RLock()
@@ -102,6 +102,7 @@ class EnsimeEnvironment(object):
     self.rv.settings().set("word_wrap", True)
     self.curr_sel = None
     self.prev_sel = None
+
 
 class EnsimeLog(object):
 
@@ -970,22 +971,19 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
     timeout = self.env.settings.get("rpc_timeout", 3)
     self.client = EnsimeClient(self.owner, self.port_file, timeout)
     self.client.startup()
-    self.client.async_req([sym("swank:connection-info")], self.response_handshake, call_back_into_ui_thread = True)
+    self.client.async_req([sym("swank:connection-info")],
+                          self.__response_handshake,
+                          call_back_into_ui_thread = True)
 
-  def response_handshake(self, server_info):
+  def __response_handshake(self, server_info):
     self.status_message("Initializing... ")
-    conf = self.env.project_config
-    m = sexp.sexp_to_key_map(conf)
-    subprojects = [sexp.sexp_to_key_map(p) for p in m.get(":subprojects",[])]
-    names = [p[":name"] for p in subprojects]
+    config.select_subproject(self.env.project_config,
+                             self.owner,
+                             self.__initialize)
 
-    # TODO(aemoncannon)
-    # Prompt user for project.
-    name = None
-    if names:
-      name = names[0]
-    conf = conf + [key(":active-subproject"), name]
-
+  def __initialize(self, subproject_name):
+    self.status_message("Starting subproject: " + str(subproject_name))
+    conf = self.env.project_config + [key(":active-subproject"), subproject_name]
     req = ensime_codec.encode_initialize_project(conf)
     self.client.async_req(
       req,
