@@ -6,8 +6,8 @@ import difflib
 
 def diff_view_with_disk(view):
   old_s = open(view.file_name()).read()
-  new_s = view.substr(Region(0, view.size() - 1))
-  return (view.size(), diff(old_s, new_s))
+  new_s = view.substr(Region(0, view.size()))
+  return diff(old_s, new_s)
 
 
 def diff(old_s, new_s):

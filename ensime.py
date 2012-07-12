@@ -44,8 +44,8 @@ class EnsimeApi:
 
   def get_completions(self, file_path, position):
     if self.v.is_dirty():
-      size_and_diff = diff.diff_view_with_disk(self.v)
-      req = ensime_codec.encode_patch_source(self.v.file_name(), size_and_diff)
+      edits = diff.diff_view_with_disk(self.v)
+      req = ensime_codec.encode_patch_source(self.v.file_name(), edits)
       self.env.controller.client.async_req(req)
 
     req = ensime_codec.encode_completions(file_path, position)
@@ -527,9 +527,8 @@ class EnsimeCodec:
   def encode_symbol_at_point(self, file_path, position):
     return [sym("swank:symbol-at-point"), str(file_path), int(position)]
 
-  def encode_patch_source(self, file_path, size_and_diff):
-    (new_size, diff) = size_and_diff
-    return [sym("swank:patch-source"), file_path, new_size, diff]
+  def encode_patch_source(self, file_path, edits):
+    return [sym("swank:patch-source"), file_path, edits]
 
   def decode_symbol_at_point(self, data):
     return self.decode_symbol(data)
