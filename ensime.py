@@ -506,7 +506,8 @@ class EnsimeCodec:
     return self.decode_type(data)
 
   def encode_completions(self, file_path, position):
-    return [sym("swank:completions"), str(file_path), int(position), 30, False]
+    return [sym("swank:completions"),
+            str(file_path), int(position), 30, False, False]
 
   def decode_completions(self, data):
     if not data: return []
