@@ -218,12 +218,18 @@ class EnsimeLog(object):
     try:
       if self.env.repl_last_fixup < last_insert:
         self.env.repl_last_fixup = last_insert
+        hack = False
         if self.env.repl_last_insert == last_insert:
           selection_was_at_end = (len(self.env.rv.sel()) == 1 and self.env.rv.sel()[0] == sublime.Region(self.env.rv.size()))
           was_read_only = self.env.rv.is_read_only()
           self.env.rv.set_read_only(False)
           edit = self.env.rv.begin_edit()
-          self.env.rv.insert(edit, self.env.rv.size(), self.repl_prompt() + what)
+          fixup = self.repl_prompt() + what
+          last_char = self.env.rv.substr(sublime.Region(self.env.rv.size() - 1, self.env.rv.size()))
+          if last_char != "\n":
+            hack = True
+            fixup = "\n" + fixup
+          self.env.rv.insert(edit, self.env.rv.size(), fixup)
           if selection_was_at_end:
             self.env.rv.show(self.env.rv.size())
             self.env.rv.sel().clear()
@@ -231,6 +237,9 @@ class EnsimeLog(object):
           self.env.rv.end_edit(edit)
           self.env.rv.set_read_only(was_read_only)
         self.repl_schedule_fixup(what, self.env.repl_last_insert)
+        # don't ask me how this works - I should have not written this spaghetti in the first place
+        if hack:
+          self.env.repl_last_insert = self.env.repl_last_insert + 1
     finally:
       self.env.repl_lock.release()
 
@@ -1081,9 +1090,6 @@ class EnsimeShowServerMessagesCommand(EnsimeWindowCommand):
       pass
     self.w.open_file("%s:%d:%d" % (server_log, line, 1), sublime.ENCODED_POSITION)
 
-# rebind Enter, Escape, Backspace, Left, ShiftLeft, Home, ShiftHome
-# persistent command history and Ctrl+Up/Ctrl+Down like in SublimeREPL
-
 class EnsimeShowClientServerReplCommand(ReadyEnsimeOnly, EnsimeWindowCommand):
   def __init__(self, window):
     super(EnsimeShowClientServerReplCommand, self).__init__(window)
@@ -1100,38 +1106,42 @@ class EnsimeShowClientServerReplCommand(ReadyEnsimeOnly, EnsimeWindowCommand):
 class EnsimeReplEnterCommand(EnsimeTextCommand):
   def run(self, edit):
     user_input = self.repl_get_input().strip()
-    if user_input:
-      self.env.repl_lock.acquire()
-      try:
-        if user_input == "cls":
-          self.env.rv.replace(edit, Region(0, self.env.rv.size()), "")
-          self.env.repl_last_insert = 0
-          self.env.repl_last_fixup = 0
-          self.repl_insert(self.repl_prompt(), False)
-        else:
+    self.env.repl_lock.acquire()
+    try:
+      if user_input == "":
+        # prompt =  + self.repl_prompt()
+        self.repl_insert("\n", True)
+        self.env.repl_last_insert = self.env.rv.size()
+        self.env.repl_last_fixup = self.env.repl_last_insert
+        self.repl_insert(self.repl_prompt(), False)
+      elif user_input == "cls":
+        self.env.rv.replace(edit, Region(0, self.env.rv.size()), "")
+        self.env.repl_last_insert = 0
+        self.env.repl_last_fixup = 0
+        self.repl_insert(self.repl_prompt(), False)
+      else:
+        if self.w.active_view():
           user_input = user_input.replace("$file", "\"" + self.w.active_view().file_name() + "\"")
           user_input = user_input.replace("$pos", str(self.w.active_view().sel()[0].begin()))
-          try:
-            _ = sexp.read_list(user_input)
-            parsed_user_input = sexp.read(user_input)
-            with open(os.path.join(self.env.log_root, "repl.history"), 'a') as f:
-              f.write(user_input + "\n")
-          except:
-            self.status_message(str(sys.exc_info()[1]))
-            return
-          self.env.repl_last_insert = self.env.rv.size()
-          self.env.repl_last_fixup = self.env.repl_last_insert
-          self.repl_insert("\n", True)
-          # self.repl_insert(self.repl_prompt(), False)
-          self.repl_schedule_fixup("", self.env.repl_last_fixup + 1)
-          self.env.controller.client.async_req(parsed_user_input)
-      finally:
-        self.env.repl_lock.release()
-    else:
-      prompt = "\n" + self.repl_prompt()
-      self.repl_insert(prompt, True)
-      self.env.repl_last_fixup = self.env.repl_last_insert
-
+        try:
+          _ = sexp.read_list(user_input)
+          parsed_user_input = sexp.read(user_input)
+          with open(os.path.join(self.env.log_root, "repl.history"), 'a') as f:
+            f.write(user_input + "\n")
+          with open(os.path.join(self.env.log_root, "repl.history"), 'r') as f:
+            lines = f.readlines() or [""]
+            self.env.repl_last_history = len(lines) - 1
+        except:
+          self.status_message(str(sys.exc_info()[1]))
+          return
+        self.env.repl_last_insert = self.env.rv.size()
+        self.env.repl_last_fixup = self.env.repl_last_insert
+        self.repl_insert("\n", True)
+        # self.repl_insert(self.repl_prompt(), False)
+        self.repl_schedule_fixup("", self.env.repl_last_fixup + 1)
+        self.env.controller.client.async_req(parsed_user_input)
+    finally:
+      self.env.repl_lock.release()
 
 class EnsimeReplEscapeCommand(EnsimeTextCommand):
   def run(self, edit):
