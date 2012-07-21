@@ -60,7 +60,19 @@ class EnsimeApi:
   def symbol_at_point_on_complete_wrapper(self, on_complete, payload):
     return on_complete(ensime_codec.decode_symbol_at_point(payload))
 
-  def handle_debug_even(self, event):
+  def handle_debug_event(self, event):
+    self.env.debug.event = event
+    if event.type == "start" or event.type == "death" or event.type == "disconnect":
+      self.env.debug.focus = None
+      for v in self.w.views():
+        EnsimeDebug(v).clear_focus()
+    elif event.type == "breakpoint" or even.type == "step":
+      class EnsimeDebugFocus(object): pass
+      self.env.debug.focus = EnsimeDebugFocus()
+      self.env.debug.focus.file_name = event.file_name
+      self.env.debug.focus.line = event.line
+      for v in self.w.views():
+        EnsimeDebug(v).update_focus(self.env.debug.focus)
     pass
 
 
@@ -96,6 +108,11 @@ class EnsimeEnvironment(object):
 
     # shared state (mutable)
     self.notes = []
+    class EnsimeDebug(object): pass
+    self.debug = EnsimeDebug()
+    self.debug.breakpoints = []
+    self.debug.focus = None
+    self.debug.event = None
     self.repl_last_insert = 0
     self.repl_last_fixup = 0
     self.repl_last_history = -1
@@ -1436,7 +1453,7 @@ class EnsimeHighlights(EnsimeCommon):
         "ensime-error",
         errors + self.v.get_regions("ensime-error"),
         "invalid.illegal",
-        self.env.settings.get("error_icon", "dot"),
+        self.env.settings.get("error_icon", "ensime-error"),
         sublime.DRAW_OUTLINED)
 
 
@@ -1628,3 +1645,24 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
     else:
       statusmessage = "Definition of " + str(info.name) + " cannot be found"
       sublime.set_timeout(functools.partial(self.v.set_status, statusgroup, statusmessage), 100)
+
+class EnsimeDebug(EnsimeCommon):
+
+  def refresh(self):
+    self.clear_focus()
+    self.update_focus(self.env.debug.focus)
+
+  def clear_focus(self):
+    self.v.erase_regions("ensime-debugfocus")
+
+  def update_focus(self, focus):
+    if self.same_files(focus.file_name, self.v.file_name()):
+      self.v.window().focus_view(self.v)
+      focused_region = self.v.full_line(self.v.text_point(focus.line, 0))
+      if self.env.settings.get("debugfocus_highlight"):
+        self.v.add_regions(
+          "ensime-debugfocus",
+          focused_region,
+          "invalid.illegal", # todo. what else standard region is here to choose?
+          self.env.settings.get("debugfocus_icon", "ensime-debugfocus"),
+          sublime.DRAW_OUTLINED)
