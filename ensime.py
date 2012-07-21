@@ -60,6 +60,9 @@ class EnsimeApi:
   def symbol_at_point_on_complete_wrapper(self, on_complete, payload):
     return on_complete(ensime_codec.decode_symbol_at_point(payload))
 
+  def handle_debug_even(self, event):
+    pass
+
 
 class EnsimeEnvironment(object):
   def __init__(self, window):
@@ -547,8 +550,10 @@ class EnsimeCodec:
     m = sexp.sexp_to_key_map(data)
     class EnsimePosition(object): pass
     position = EnsimePosition()
-    position.file_name = m[":file"]
-    position.offset = m[":offset"]
+    position.file_name = m[":file"] if ":file" in m else None
+    position.offset = m[":offset"] if ":offset" in m else None
+    position.start = m[":start"] if ":start" in m else None
+    position.end = m[":end"] if ":end" in m else None
     return position
 
   def decode_types(self, data):
@@ -561,11 +566,18 @@ class EnsimeCodec:
     info = TypeInfo()
     info.name = m[":name"]
     info.type_id = m[":type-id"]
-    info.full_name = m[":full-name"] if ":full-name" in m else None
-    info.decl_as = m[":decl-as"] if ":decl-as" in m else None
-    info.decl_pos = self.decode_position(m[":pos"]) if ":pos" in m else None
-    info.type_args = self.decode_types(m[":type-args"]) if ":type-args" in m else []
-    info.outer_type_id = m[":outer-type-id"] if ":outer-type-id" in m else None
+    if ":arrow-type" in m:
+      info.arrow_type = True
+      info.result_type = self.decode_type(m[":result_type"])
+      info.param_sections = self.decode_members(m[":param-sections"]) if ":param-sections" in m else []
+    else:
+      info.arrow_type = False
+      info.full_name = m[":full-name"] if ":full-name" in m else None
+      info.decl_as = m[":decl-as"] if ":decl-as" in m else None
+      info.decl_pos = self.decode_position(m[":pos"]) if ":pos" in m else None
+      info.type_args = self.decode_types(m[":type-args"]) if ":type-args" in m else []
+      info.outer_type_id = m[":outer-type-id"] if ":outer-type-id" in m else None
+      info.members = self.decode_members(m[":members"]) if ":members" in m else []
     return info
 
   def decode_symbol(self, data):
@@ -575,7 +587,76 @@ class EnsimeCodec:
     info.name = m[":name"]
     info.type = self.decode_type(m[":type"])
     info.decl_pos = self.decode_position(m[":decl-pos"]) if ":decl-pos" in m else None
+    info.is_callable = bool(m[":is-callable"]) if ":is-callable" in m else False
+    info.owner_type_id = m[":owner-type-id"] if ":owner-type-id" in m else None
     return info
+
+  def decode_members(self, data):
+    if not data: return []
+    return [self.decode_member(m) for m in data]
+
+  def decode_member(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class MemberInfo(object): pass
+    info = MemberInfo()
+    info.name = m[":name"]
+    # todo. implement this in accordance with SwankProtocol.scala
+    return info
+
+  def decode_param_sections(self, data):
+    if not data: return []
+    return [self.decode_param_section(ps) for ps in data]
+
+  def decode_param_section(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class ParamSectionInfo(object): pass
+    info = ParamSectionInfo()
+    info.is_implicit = bool(m[":is-implicit"]) if ":is-implicit" in m else False
+    info.params = self.decode_params(m[":params"]) if ":params" in m else []
+    return info
+
+  def decode_params(self, data):
+    if not data: return []
+    return [self.decode_param(p) for p in data]
+
+  def decode_param(self, data):
+    # todo. implement this in accordance with SwankProtocol.scala
+    return None
+
+  def decode_debug_event(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class EnsimeDebugEvent(object): pass
+    event = EnsimeDebugEvent()
+    event.type = m[":type"]
+    if event.type == "output":
+      event.body = m[":body"]
+    elif event.type == "step":
+      event.thread_id = m[":thread-id"]
+      event.thread_name = m[":thread-name"]
+      event.file_name = m[":file"]
+      event.line = m[":line"]
+    elif event.type == "breakpoint":
+      event.thread_id = m[":thread-id"]
+      event.thread_name = m[":thread-name"]
+      event.file_name = m[":file"]
+      event.line = m[":line"]
+    elif event.type == "death":
+      pass
+    elif event.type == "start":
+      pass
+    elif event.type == "disconnect":
+      pass
+    elif event.type == "exception":
+      event.exception_id = m[":exception"]
+      event.thread_id = m[":thread-id"]
+      event.thread_name = m[":thread-name"]
+    elif event.type == "thread-start":
+      event.thread_id = m[":thread-id"]
+    elif event.type == "thread-death":
+      event.thread_id = m[":thread-id"]
+    else:
+      raise Exception("unexpected debug event of type " + event.type + ": " + str(m))
+    return event
 
 ensime_codec = EnsimeCodec()
 
@@ -744,6 +825,11 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
   @call_back_into_ui_thread
   def message_clear_all_scala_notes(self, msg_id, payload):
     self.clear_notes()
+
+  @call_back_into_ui_thread
+  def message_debug_event(self, msg_id, payload):
+    debug_event = ensime_codec.decode_debug_event(payload)
+    self.handle_debug_event(debug_event)
 
   def init_counters(self):
     self._counter = 0
