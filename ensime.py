@@ -1,7 +1,7 @@
 import sublime
 from sublime import *
 from sublime_plugin import *
-import os, threading, thread, socket, getpass
+import os, threading, thread, socket, getpass, signal
 import subprocess, killableprocess, tempfile, datetime, time
 import functools, inspect, traceback, random, re
 from sexp import sexp
@@ -781,16 +781,16 @@ class EnsimeServerProcess(EnsimeCommon):
     previous = processes.get(str(os.getpid()), None)
     if previous:
       self.log_server("killing orphaned ensime server process with pid " + str(previous))
-      if os.name == "nt":
-        try:
+      try:
+        if os.name == "nt":
           job_name = "Global\\sublime-ensime-" + str(os.getpid())
           self.log_server("killing a job named: " + job_name)
           job = killableprocess.winprocess.OpenJobObject(0x1F001F, True, job_name)
           killableprocess.winprocess.TerminateJobObject(job, 127)
-        except:
-          self.log_server(sys.exc_info()[1])
-      else:
-        os.killpg(int(previous), signal.SIGKILL)
+        else:
+          os.killpg(int(previous), signal.SIGKILL)
+      except:
+        self.log_server(sys.exc_info()[1])
 
     # HACK #2: garbage collect ensime server processes that were started by sublimes, but weren't stopped
     # unfortunately, atexit doesn't work (see the commented code above), so we have to resort to this ugliness
