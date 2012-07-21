@@ -702,7 +702,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     lines = [line.strip() for line in open(filename)]
     msg = lines[random.randint(0, len(lines) - 1)]
     self.status_message(msg + " This could be the start of a beautiful program, " + getpass.getuser().capitalize()  + ".")
-    if self.in_project(self.v.file_name()):
+    if self.v and self.in_project(self.v.file_name()):
       self.v.run_command("save")
 
   @call_back_into_ui_thread
