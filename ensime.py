@@ -650,9 +650,10 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     # (:compiler-ready t)
     # (:typecheck-result (:lang :scala :is-full t :notes nil))
     msg_type = str(data[0])
-    handler, _, _ = self.handlers.get(msg_type)
+    handler = self.handlers.get(msg_type)
 
     if handler:
+      handler, _, _ = handler
       msg_id = data[-1] if msg_type == ":return" else None
       data = data[1:-1] if msg_type == ":return" else data[1:]
       payload = None
@@ -970,6 +971,7 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
             message += "Please, set it to a meaningful value and restart ENSIME."
             sublime.set_timeout(functools.partial(sublime.error_message, message), 0)
             raise Exception("external_server_port_file not specified")
+          self.ready = True # external server is deemed to be always ready
           sublime.set_timeout(functools.partial(self.request_handshake), 0)
         else:
           _, port_file = tempfile.mkstemp("ensime_port")
