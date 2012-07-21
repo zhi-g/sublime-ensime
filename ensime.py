@@ -658,6 +658,85 @@ class EnsimeCodec:
       raise Exception("unexpected debug event of type " + event.type + ": " + str(m))
     return event
 
+  def decode_debug_backtrace(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class EnsimeDebugBacktrace(object): pass
+    backtrace = EnsimeDebugBacktrace()
+    backtrace.frames = self.decode_debug_stack_frames(m[":frames"]) if ":frames" in m else []
+    backtrace.thread_id = m[":thread-id"]
+    backtrace.thread_name = m[":thread-name"]
+    return backtrace
+
+  def decode_debug_stack_frames(self, data):
+    if not data: return []
+    return [self.decode_debug_frame(f) for f in data]
+
+  def decode_debug_stack_frame(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class EnsimeDebugStackFrame(object): pass
+    stackframe = EnsimeDebugStackFrame()
+    stackframe.index = m[":index"]
+    stackframe.locals = self.decode_debug_stack_locals(m[":locals"]) if ":locals" in m else []
+    stackframe.num_args = m[":num-args"]
+    stackframe.class_name = m[":class-name"]
+    stackframe.method_name = m[":method-name"]
+    stackframe.pc_location = self.decode_debug_source_position(m[":pc-location"])
+    stackframe.this_object_id = m[":this-object-id"]
+    return stackframe
+
+  def decode_debug_source_position(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class EnsimeDebugSourcePosition(object): pass
+    position = EnsimeDebugSourcePosition()
+    position.file_name = m[":file"]
+    position.line = m[":line"]
+    return position
+
+  def decode_debug_stack_locals(self, data):
+    if not data: return []
+    return [self.decode_debug_stack_local(loc) for loc in data]
+
+  def decode_debug_stack_local(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class EnsimeDebugStackLocal(object): pass
+    loc = EnsimeDebugStackLocal()
+    loc.index = m[":index"]
+    loc.name = m[":name"]
+    loc.summary = m[":summary"]
+    loc.type_name = m[":type-name"]
+    return loc
+
+  def decode_debug_value(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class EnsimeDebugValue(object): pass
+    value = EnsimeDebugValue()
+    value.type = m[":val-type"]
+    value.type_name = m[":type-name"]
+    value.length = m[":length"] if ":length" in m else None
+    value.element_type_name = m[":element-type-name"] if ":element-type-name" in m else None
+    value.summary = m[":summary"] if ":summary" in m else None
+    value.object_id = m[":object_id"] if ":object_id" in m else None
+    value.fields = self.decode_debug_object_fields(m[":fields"]) if ":fields" in m else []
+    if value.type == "null" or value.type == "prim" or value.type == "obj" or value.type == "str" or value.type == "arr":
+      pass
+    else:
+      raise Exception("unexpected debug value of type " + value.type + ": " + str(m))
+    return value
+
+  def decode_debug_object_fields(self, data):
+    if not data: return []
+    return [self.decode_debug_object_field(f) for f in data]
+
+  def decode_debug_object_field(self, data):
+    m = sexp.sexp_to_key_map(data)
+    class EnsimeDebugObjectField(object): pass
+    field = EnsimeDebugObjectField()
+    field.index = m[":index"]
+    field.name = m[":name"]
+    field.summary = m[":summary"]
+    field.type_name = m[":type-name"]
+    return field
+
 ensime_codec = EnsimeCodec()
 
 class EnsimeClient(EnsimeClientListener, EnsimeCommon):
