@@ -14,7 +14,7 @@ and inspired us to kick off the project.
 
 SublimeScala project is an early alpha. Some basic things might work (for example, error highlighting), but basically anything might blow up in your face. Please, submit issues to our tracker if you catch SublimeScala doing that: https://github.com/sublimescala/sublime-ensime/issues/new.
 
-Also note that SublimeScala uses pre-release Scala compiler (which roughly corresponds to 2.10.0-M4). This might also produce funny bugs. Use our bug reporting facility to report those: https://issues.scala-lang.org/secure/CreateIssue!default.jspa.
+Also note that SublimeScala uses pre-release Scala compiler (which roughly corresponds to 2.10.0-M5). This might also produce funny bugs. Use our bug reporting facility to report those: https://issues.scala-lang.org/secure/CreateIssue!default.jspa.
 
 Anyways this venture is very important for the project maintainers, since we use Scala every day, so we'll do our best to release something workable within a few months (ideally, before the final release of Scala 2.10.0).
 
