@@ -41,7 +41,7 @@ The first release will include go to definition (aka ctrl+click), on-the-fly err
     ```
 
     b. In Windows, just download the version of Ensime listed in the `./install-ensime-server` file
-    from https://github.com/sublimescala/ensime/downloads. It will contain a directory with the same
+    from https://github.com/aemoncannon/ensime/downloads. It will contain a directory with the same
     name as Ensime version. Extract it into the just created `sublime-ensime` directory and rename
     to `server`.
 
