@@ -67,13 +67,14 @@ class EnsimeApi:
       self.env.debug.focus = None
       for v in self.w.views():
         EnsimeDebug(v).clear_focus()
-    elif event.type == "breakpoint" or even.type == "step":
+    elif event.type == "breakpoint" or event.type == "step":
       class EnsimeDebugFocus(object): pass
       self.env.debug.focus = EnsimeDebugFocus()
       self.env.debug.focus.file_name = event.file_name
       self.env.debug.focus.line = event.line
       for v in self.w.views():
         EnsimeDebug(v).update_focus(self.env.debug.focus)
+      # todo. if the view is not open yet, launch it in sublime and position its the viewport
     pass
 
 
@@ -660,34 +661,34 @@ class EnsimeCodec:
     class EnsimeDebugEvent(object): pass
     event = EnsimeDebugEvent()
     event.type = m[":type"]
-    if event.type == "output":
+    if str(event.type) == "output":
       event.body = m[":body"]
-    elif event.type == "step":
+    elif str(event.type) == "step":
       event.thread_id = m[":thread-id"]
       event.thread_name = m[":thread-name"]
       event.file_name = m[":file"]
       event.line = m[":line"]
-    elif event.type == "breakpoint":
+    elif str(event.type) == "breakpoint":
       event.thread_id = m[":thread-id"]
       event.thread_name = m[":thread-name"]
       event.file_name = m[":file"]
       event.line = m[":line"]
-    elif event.type == "death":
+    elif str(event.type) == "death":
       pass
-    elif event.type == "start":
+    elif str(event.type) == "start":
       pass
-    elif event.type == "disconnect":
+    elif str(event.type) == "disconnect":
       pass
-    elif event.type == "exception":
+    elif str(event.type) == "exception":
       event.exception_id = m[":exception"]
       event.thread_id = m[":thread-id"]
       event.thread_name = m[":thread-name"]
-    elif event.type == "thread-start":
+    elif str(event.type) == "thread-start":
       event.thread_id = m[":thread-id"]
-    elif event.type == "thread-death":
+    elif str(event.type) == "thread-death":
       event.thread_id = m[":thread-id"]
     else:
-      raise Exception("unexpected debug event of type " + event.type + ": " + str(m))
+      raise Exception("unexpected debug event of type " + str(event.type) + ": " + str(m))
     return event
 
   def decode_debug_backtrace(self, data):
@@ -749,10 +750,10 @@ class EnsimeCodec:
     value.summary = m[":summary"] if ":summary" in m else None
     value.object_id = m[":object_id"] if ":object_id" in m else None
     value.fields = self.decode_debug_object_fields(m[":fields"]) if ":fields" in m else []
-    if value.type == "null" or value.type == "prim" or value.type == "obj" or value.type == "str" or value.type == "arr":
+    if str(value.type) == "null" or str(value.type) == "prim" or str(value.type) == "obj" or str(value.type) == "str" or str(value.type) == "arr":
       pass
     else:
-      raise Exception("unexpected debug value of type " + value.type + ": " + str(m))
+      raise Exception("unexpected debug value of type " + str(value.type) + ": " + str(m))
     return value
 
   def decode_debug_object_fields(self, data):
@@ -1458,7 +1459,7 @@ class EnsimeHighlights(EnsimeCommon):
       self.v.add_regions(
         "ensime-error-underline",
         underlines + self.v.get_regions("ensime-error-underline"),
-        "invalid.illegal",
+        self.env.settings.get("error_scope", "invalid.illegal"),
         sublime.DRAW_EMPTY_AS_OVERWRITE)
 
     # Outline entire errored line
@@ -1467,7 +1468,7 @@ class EnsimeHighlights(EnsimeCommon):
       self.v.add_regions(
         "ensime-error",
         errors + self.v.get_regions("ensime-error"),
-        "invalid.illegal",
+        self.env.settings.get("error_scope", "invalid.illegal"),
         self.env.settings.get("error_icon", "ensime-error"),
         sublime.DRAW_OUTLINED)
 
@@ -1727,9 +1728,10 @@ class EnsimeDebug(EnsimeCommon):
       self.v.window().focus_view(self.v)
       focused_region = self.v.full_line(self.v.text_point(focus.line, 0))
       if self.env.settings.get("debugfocus_highlight"):
+        # todo. also position the viewport correctly
         self.v.add_regions(
           "ensime-debugfocus",
           focused_region,
-          "invalid.illegal", # todo. what else standard region is here to choose?
+          self.env.settings.get("debugfocus_scope", "invalid.deprecated"),
           self.env.settings.get("debugfocus_icon", "ensime-debugfocus"),
           sublime.DRAW_OUTLINED)
