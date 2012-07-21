@@ -284,7 +284,7 @@ class EnsimeBase(object):
       self.v = owner
       self.f = owner.file_name()
     else:
-      raise "unsupported owner of type: " + str(type(owner))
+      raise Exception("unsupported owner of type: " + str(type(owner)))
 
   def same_files(self, filename1, filename2):
     if not filename1 or not filename2:
@@ -351,7 +351,7 @@ class ConnectedEnsimeOnly:
 
 class ProjectFileOnly:
   def is_enabled(self):
-    return not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.connected and self.in_project(self.v.file_name())
+    return not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.connected and self.v and self.in_project(self.v.file_name())
 
 class EnsimeContextProvider(EventListener):
   def on_query_context(self, view, key, operator, operand, match_all):
@@ -410,7 +410,7 @@ class EnsimeClientSocket(EnsimeCommon):
               # self.log_client("RECV: received a chunk of " + str(len(chunk)) + " bytes")
               buf += chunk
             else:
-              raise "fatal error: recv returned None"
+              raise Exception("fatal error: recv returned None")
           self.log_client("RECV: " + buf)
 
           try:
@@ -421,7 +421,7 @@ class EnsimeClientSocket(EnsimeCommon):
             self.log_client("failed to parse incoming message")
             raise
         else:
-          raise "fatal error: recv returned None"
+          raise Exception("fatal error: recv returned None")
       except Exception:
         self.log_client("*****    ERROR     *****")
         self.log_client(traceback.format_exc())
@@ -1127,6 +1127,11 @@ class EnsimeReplEnterCommand(EnsimeTextCommand):
           self.env.controller.client.async_req(parsed_user_input)
       finally:
         self.env.repl_lock.release()
+    else:
+      prompt = "\n" + self.repl_prompt()
+      self.repl_insert(prompt, True)
+      self.env.repl_last_fixup = self.env.repl_last_insert
+
 
 class EnsimeReplEscapeCommand(EnsimeTextCommand):
   def run(self, edit):
