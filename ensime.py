@@ -1405,28 +1405,27 @@ class EnsimeCtrlTilde(EnsimeWindowCommand):
     else:
       self.w.run_command("hide_panel", {"panel": "console"})
 
-completions = []
+
+# Tracks the most recent completion prefix that has been shown to yield empty
+# completion results. Use this so we don't repeatedly hit ensime for results
+# that don't exist.
+g_completion_ignore_prefix = None
+
 class EnsimeCompletionsListener(EventListener):
 
-#  def on_modified(self, view):
-#    history = view.command_history(0, True)
-#    if (history[0] == 'insert'):
-#      chars = history[1]['characters'].strip()
-#      if re.match("[A-z0-9_\\-.]", chars):
-#        print "ac: " + chars
-#        sublime.set_timeout(bind(self._activate_ac, view), 0)
-#      else:
-#        print "no-ac: " + chars
-#
-#  def _activate_ac(self, view):
-#    view.run_command('auto_complete', {
-#        'disable_auto_insert': True,
-#        'api_completions_only': True,
-#        'next_completion_if_showing': False,
-#        'auto_complete_commit_on_tab': True
-#        })
+  def _signature_doc(self, signature):
+    """Given a ensime CompletionSignature structure, returns a short
+    string suitable for showing in the help section of the completion
+    pop-up."""
+    sections = signature[0] or []
+    section_param_strs = [[param[1] for param in params] for params in sections]
+    section_strs = ["(" + ", ".join(tpes) + ")" for tpes in
+                    section_param_strs]
+    return ", ".join(section_strs)
 
   def _signature_snippet(self, signature):
+    """Given a ensime CompletionSignature structure, returns a Sublime Text
+    snippet describing the method parameters."""
     snippet = []
     sections = signature[0] or []
     section_snippets = []
@@ -1434,20 +1433,45 @@ class EnsimeCompletionsListener(EventListener):
     for params in sections:
       param_snippets = []
       for param in params:
-        param_snippets.append("${%s:%s}" % (i, param))
+        name,tpe = param
+        param_snippets.append("${%s:%s:%s}" % (i, name, tpe))
         i += 1
       section_snippets.append("(" + ", ".join(param_snippets) + ")")
     return ", ".join(section_snippets)
 
-  def on_query_completions(self, view, prefix, locations):
-    print "..."
-    if not view.match_selector(locations[0], "source.scala"): return []
-    api = ensime_api(view)
-    completions = api.get_completions(view.file_name(), locations[0], 0) if api else []
-    return ([(c.name + "\t" + str(c.signature),
-              c.name + self._signature_snippet(c.signature)) for c in completions],
+  def _completion_response(self, ensime_completions):
+    """Transform list of completions from ensime API to a the structure
+    necessary for returning to sublime API."""
+    return ([(c.name + "\t" + self._signature_doc(c.signature),
+              c.name + self._signature_snippet(c.signature))
+             for c in ensime_completions],
             sublime.INHIBIT_EXPLICIT_COMPLETIONS |
             sublime.INHIBIT_WORD_COMPLETIONS)
+
+  def on_query_completions(self, view, prefix, locations):
+    """Query the ensime API for completions. Note: we must ask for _all_
+    completions as sublime will not re-query unless this query returns an
+    empty list."""
+
+    # Short circuit for prefix that is known to return empty list
+    # TODO(aemoncannon): Clear ignore prefix if the user
+    # moves point to new context.
+    global g_completion_ignore_prefix
+    if (g_completion_ignore_prefix and
+        prefix.startswith(g_completion_ignore_prefix)):
+      return self._completion_response([])
+    else:
+      g_completion_ignore_prefix = None
+
+    if not view.match_selector(locations[0], "source.scala"): return []
+    api = ensime_api(view)
+    completions = api.get_completions(
+      view.file_name(), locations[0], 0) if api else []
+
+    if not completions:
+      g_completion_ignore_prefix = prefix
+
+    return self._completion_response(completions)
 
 
 
