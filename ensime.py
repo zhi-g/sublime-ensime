@@ -130,6 +130,11 @@ class EnsimeEnvironment(object):
     self.curr_sel = None
     self.prev_sel = None
 
+    # Tracks the most recent completion prefix that has been shown to yield empty
+    # completion results. Use this so we don't repeatedly hit ensime for results
+    # that don't exist.
+    self.completion_ignore_prefix = None
+
 
 class EnsimeLog(object):
 
@@ -358,6 +363,15 @@ class EnsimeTextCommand(EnsimeCommon, TextCommand):
   def __init__(self, view):
     super(EnsimeTextCommand, self).__init__(view)
     self.view = view
+
+class EnsimeEventListener(EventListener):
+  """Mixin for event listeners that require access to an ensime environment."""
+  def with_api(self, view, what, default=None):
+    api = ensime_api(view)
+    if api and api.in_project(view.file_name()):
+      return what(api)
+    else:
+      return default
 
 class ScalaOnly:
   def is_enabled(self):
@@ -1513,11 +1527,7 @@ class EnsimeShowNotesCommand(ConnectedEnsimeOnly, EnsimeTextCommand):
     v.sel().clear()
     v.sel().add(Region(0, 0))
 
-class EnsimeHighlightDaemon(EventListener):
-  def with_api(self, view, what):
-    api = ensime_api(view)
-    if api and api.in_project(view.file_name()):
-      what(api)
+class EnsimeHighlightDaemon(EnsimeEventListener):
 
   def on_load(self, view):
     self.with_api(view, lambda api: api.type_check_file(view.file_name()))
@@ -1605,12 +1615,10 @@ class EnsimeCtrlTilde(EnsimeWindowCommand):
       self.w.run_command("hide_panel", {"panel": "console"})
 
 
-# Tracks the most recent completion prefix that has been shown to yield empty
-# completion results. Use this so we don't repeatedly hit ensime for results
-# that don't exist.
-g_completion_ignore_prefix = None
+class EnsimeCompletionsListener(EnsimeEventListener):
 
-class EnsimeCompletionsListener(EventListener):
+  def __init__(self):
+    super(EnsimeCompletionsListener, self).__init__()
 
   def _signature_doc(self, signature):
     """Given a ensime CompletionSignature structure, returns a short
@@ -1647,31 +1655,29 @@ class EnsimeCompletionsListener(EventListener):
             sublime.INHIBIT_EXPLICIT_COMPLETIONS |
             sublime.INHIBIT_WORD_COMPLETIONS)
 
-  def on_query_completions(self, view, prefix, locations):
+  def _query_completions(self, view, prefix, locations, api):
     """Query the ensime API for completions. Note: we must ask for _all_
     completions as sublime will not re-query unless this query returns an
     empty list."""
-
     # Short circuit for prefix that is known to return empty list
     # TODO(aemoncannon): Clear ignore prefix if the user
     # moves point to new context.
-    global g_completion_ignore_prefix
-    if (g_completion_ignore_prefix and
-        prefix.startswith(g_completion_ignore_prefix)):
+    if (api.env.completion_ignore_prefix and
+        prefix.startswith(api.env.completion_ignore_prefix)):
       return self._completion_response([])
     else:
-      g_completion_ignore_prefix = None
-
+      api.env.completion_ignore_prefix = None
     if not view.match_selector(locations[0], "source.scala"): return []
-    api = ensime_api(view)
     completions = api.get_completions(
       view.file_name(), locations[0], 0) if api else []
-
     if not completions:
-      g_completion_ignore_prefix = prefix
-
+      api.env.completion_ignore_prefix = prefix
     return self._completion_response(completions)
 
+  def on_query_completions(self, view, prefix, locations):
+    return self.with_api(view,
+                         bind(self._query_completions, view, prefix, locations),
+                         default=[])
 
 
 class EnsimeInspectTypeAtPoint(ProjectFileOnly, EnsimeTextCommand):
