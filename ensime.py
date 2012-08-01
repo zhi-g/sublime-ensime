@@ -80,6 +80,9 @@ class EnsimeApi:
 
 class EnsimeEnvironment(object):
   def __init__(self, window):
+    self.recalc(window)
+
+  def recalc(self, window):
     # plugin-wide stuff (immutable)
     self.settings = sublime.load_settings("Ensime.sublime-settings")
     server_dir = self.settings.get(
@@ -1248,6 +1251,9 @@ class EnsimeStartupCommand(NotRunningOnly, EnsimeWindowCommand):
     return super(EnsimeStartupCommand, self).is_enabled()
 
   def run(self):
+    # refreshes the config (fixes #29)
+    self.env.recalc(self.w)
+
     if not self.env.project_config:
       message = "ENSIME server has been unable to start, because a valid .ensime configuration file wasn't found."
       message += "\n\n"
