@@ -836,7 +836,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     self.handle_message(data)
 
   # examples of responses can be seen here:
-  # http://aemon.com/file_dump/ensime_manual.html#tth_sEcC.2
+  # http://aemoncannon.github.com/ensime/index.html#tth_sEcC.2
   def handle_message(self, data):
     # (:return (:ok (:pid nil :server-implementation (:name "ENSIMEserver") :machine nil :features nil :version "0.0.1")) 1)
     # (:background-message "Initializing Analyzer. Please wait...")
@@ -1254,7 +1254,7 @@ class EnsimeStartupCommand(NotRunningOnly, EnsimeWindowCommand):
       message += "Create a file named .ensime in the root of one of your project's folders and retry. "
       example = "(:root-dir \"d:/Dropbox/Scratchpad/Scala\" :sources (\"d:/Dropbox/Scratchpad/Scala\") :target \"d:/Dropbox/Scratchpad/Scala\")"
       message += "Here is a simple example of an .ensime file: \n\n" + example + "\n\n"
-      message += "For more information refer to the \"Config File Format\" section of the docs: http://aemon.com/file_dump/ensime_manual.html"
+      message += "For more information refer to the \"Config File Format\" section of the docs: http://aemoncannon.github.com/ensime/index.html"
       self.error_message(message)
       return
     EnsimeController(self.w).startup()
