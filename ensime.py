@@ -8,6 +8,7 @@ from functools import partial as bind
 from sexp import sexp
 from sexp.sexp import key, sym
 from string import strip
+from types import *
 import env
 import dotensime
 import diff
@@ -520,7 +521,48 @@ class EnsimeClientSocket(EnsimeCommon):
       self.connected = False
       self._connect_lock.release()
 
+# http://stackoverflow.com/questions/10067262/automatically-decorating-every-instance-method-in-a-class
+def log_all_methods():
+  def logged(wrappee):
+    def wrapper(*args, **kwargs):
+      try:
+        return wrappee(*args, **kwargs)
+      except Exception:
+        # todo. strictly speaking we should pass env into codec
+        # however that's too much of a hassle to implement at the moment
+        api = ensime_api(sublime.active_window())
+        # todo. how do I get the name of the method?
+        # sure it'll be in the stack trace, but I want it to stand out in the log entry header
+        s_callinfo = wrappee.func_name + "(" + str(args)
+        if len(kwargs) != 0:
+          if len(args) != 0:
+            s_callinfo = s_callinfo + ", "
+          s_callinfo = s_callinfo + str(kwargs)
+        s_callinfo = s_callinfo + ")"
+        s_excinfo =  traceback.format_exc()
+        api.log_client("codec error when processing: " + s_callinfo + "\n" + s_excinfo)
+        raise
+    return wrapper
+
+  def do_decorate(attr, value):
+    return '__' not in attr and isinstance(value, FunctionType)
+
+  class DecorateAll(type):
+    def __new__(cls, name, bases, dct):
+      for attr, value in dct.iteritems():
+        if do_decorate(attr, value):
+          dct[attr] = logged(value)
+      return super(DecorateAll, cls).__new__(cls, name, bases, dct)
+    def __setattr__(self, attr, value):
+      if do_decorate(attr, value):
+        value = logged(value)
+      super(DecorateAll, self).__setattr__(attr, value)
+
+  return DecorateAll
+
 class EnsimeCodec:
+  __metaclass__ = log_all_methods()
+
   def encode_initialize_project(self, conf):
     return [sym("swank:init-project"), conf]
 
@@ -604,7 +646,7 @@ class EnsimeCodec:
     info.type_id = m[":type-id"]
     if ":arrow-type" in m:
       info.arrow_type = True
-      info.result_type = self.decode_type(m[":result_type"])
+      info.result_type = self.decode_type(m[":result-type"])
       info.param_sections = self.decode_members(m[":param-sections"]) if ":param-sections" in m else []
     else:
       info.arrow_type = False
@@ -635,7 +677,6 @@ class EnsimeCodec:
     m = sexp.sexp_to_key_map(data)
     class MemberInfo(object): pass
     info = MemberInfo()
-    info.name = m[":name"]
     # todo. implement this in accordance with SwankProtocol.scala
     return info
 
