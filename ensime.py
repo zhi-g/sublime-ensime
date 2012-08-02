@@ -911,17 +911,20 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     # (:return (:ok (:project-name nil :source-roots ("D:\\Dropbox\\Scratchpad\\Scala"))) 2)
     if reply_type == ":ok":
       payload = payload[1]
-      if handler:
-        if callable(handler):
-          if call_back_into_ui_thread:
-            sublime.set_timeout(bind(handler, payload), 0)
+      if payload:
+        if handler:
+          if callable(handler):
+            if call_back_into_ui_thread:
+              sublime.set_timeout(bind(handler, payload), 0)
+            else:
+              handler(payload)
           else:
-            handler(payload)
+            handler.payload = payload
+            handler.set()
         else:
-          handler.payload = payload
-          handler.set()
+          self.log_client("warning: no handler registered for message #" + str(msg_id) + " with payload " + str(payload))
       else:
-        self.log_client("warning: no handler registered for message #" + str(msg_id) + " with payload " + str(payload))
+        self.log_client("warning: empty payload received for message #" + str(msg_id))
     # (:return (:abort 210 "Error occurred in Analyzer. Check the server log.") 3)
     elif reply_type == ":abort":
       detail = payload[2]
