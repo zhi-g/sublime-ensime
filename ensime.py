@@ -88,21 +88,18 @@ class EnsimeEnvironment(object):
     self.settings = sublime.load_settings("Ensime.sublime-settings")
     server_dir = self.settings.get(
       "ensime_server_path",
-      "sublime_ensime\\server"
-      if os.name == 'nt' else "sublime_ensime/server")
+      "sublime_ensime" + os.sep + "server")
     self.server_path = (server_dir
-                        if (server_dir.startswith("/") or
-                            (":/" in server_dir) or
-                            (":\\" in server_dir))
+                        if os.path.isabs(server_dir)
                         else os.path.join(sublime.packages_path(), server_dir))
-    self.ensime_executable = (self.server_path + '/' +
+    self.ensime_executable = (self.server_path + os.sep +
                               ("bin\\server.bat" if os.name == 'nt'
                                else "bin/server"))
     self.plugin_root = os.path.normpath(os.path.join(self.server_path, ".."))
     self.log_root = os.path.normpath(os.path.join(self.plugin_root, "logs"))
 
     # instance-specific stuff (immutable)
-    (root, conf) = dotensime.load(window)
+    (root, conf, _) = dotensime.load(window)
     self.project_root = root
     self.project_config = conf
     self.valid = self.project_config != None
@@ -948,7 +945,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
 
   @call_back_into_ui_thread
   def message_compiler_ready(self, msg_id, payload):
-    filename = self.env.plugin_root + "/Encouragements.txt"
+    filename = self.env.plugin_root + os.sep + "Encouragements.txt"
     lines = [line.strip() for line in open(filename)]
     msg = lines[random.randint(0, len(lines) - 1)]
     self.status_message(msg + " This could be the start of a beautiful program, " + getpass.getuser().capitalize()  + ".")
@@ -1169,11 +1166,12 @@ class EnsimeServer(EnsimeServerListener, EnsimeCommon):
     if not os.path.exists(self.env.ensime_executable):
       message = "ENSIME executable \"" + self.env.ensime_executable + "\" does not exist."
       message += "\n\n"
-      message += "If you haven't yet installed ENSIME, download it from https://github.com/sublimescala/ensime/downloads, "
-      message += "and unpack it into the folder of the SublimeEnsime plugin."
+      message += "If you haven't yet installed ENSIME, download it from https://github.com/aemoncannon/ensime/downloads, "
+      message += "and unpack it into the \"server\" subfolder of the SublimeEnsime plugin home, which is usually located at " + sublime.packages_path() + os.sep + "sublime-ensime. "
+      message += "Your installation is correct if inside the \"server\" subfolder there are folders named \"bin\" and \"lib\"."
       message += "\n\n"
-      message += "If you have already installed ENSIME, check your Ensime.sublime-settings and make sure that "
-      message += "the \"ensime_server_path\" entry points to a valid location relative to " + sublime.packages_path() + " "
+      message += "If you have already installed ENSIME, check your Ensime.sublime-settings (accessible via Preferences > Package Settings > Ensime) "
+      message += "and make sure that the \"ensime_server_path\" entry points to a valid location relative to " + sublime.packages_path() + " "
       message += "(currently it points to the path shown above)."
       self.error_message(message)
       return
@@ -1213,7 +1211,7 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
           if not self.port_file:
             message = "\"connect_to_external_server\" in your Ensime.sublime-settings is set to true, "
             message += "however \"external_server_port_file\" is not specified. "
-            message += "Please, set it to a meaningful value and restart ENSIME."
+            message += "Set it to a meaningful value and restart ENSIME."
             sublime.set_timeout(bind(sublime.error_message, message), 0)
             raise Exception("external_server_port_file not specified")
           self.ready = True # external server is deemed to be always ready
@@ -1290,23 +1288,18 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
       self.env.lifecycleLock.release()
 
 class EnsimeStartupCommand(NotRunningOnly, EnsimeWindowCommand):
-  def is_enabled(self, enable = True):
-    if not self.env.project_config: return True
-    return super(EnsimeStartupCommand, self).is_enabled()
+  def is_enabled(self):
+    return not self.env.in_transition and not (self.env.controller and self.env.controller.running)
 
   def run(self):
     # refreshes the config (fixes #29)
     self.env.recalc(self.w)
 
     if not self.env.project_config:
-      message = "ENSIME server has been unable to start, because a valid .ensime configuration file wasn't found."
-      message += "\n\n"
-      message += "Create a file named .ensime in the root of one of your project's folders and retry. "
-      example = "(:root-dir \"d:/Dropbox/Scratchpad/Scala\" :sources (\"d:/Dropbox/Scratchpad/Scala\") :target \"d:/Dropbox/Scratchpad/Scala\")"
-      message += "Here is a simple example of an .ensime file: \n\n" + example + "\n\n"
-      message += "For more information refer to the \"Config File Format\" section of the docs: http://aemoncannon.github.com/ensime/index.html"
-      self.error_message(message)
+      (_, _, error_handler) = dotensime.load(self.w)
+      error_handler()
       return
+
     EnsimeController(self.w).startup()
 
 class EnsimeShutdownCommand(RunningOnly, EnsimeWindowCommand):
@@ -1319,6 +1312,9 @@ class EnsimeRestartCommand(RunningOnly, EnsimeWindowCommand):
     sublime.set_timeout(bind(self.w.run_command, "ensime_startup"), 100)
 
 class EnsimeShowClientMessagesCommand(EnsimeWindowCommand):
+  def is_enabled(self):
+    return self.env.valid
+
   def run(self):
     # self.view_show(self.env.cv, False)
     client_log = os.path.join(self.env.log_root, "client.log")
@@ -1330,6 +1326,9 @@ class EnsimeShowClientMessagesCommand(EnsimeWindowCommand):
     self.w.open_file("%s:%d:%d" % (client_log, line, 1), sublime.ENCODED_POSITION)
 
 class EnsimeShowServerMessagesCommand(EnsimeWindowCommand):
+  def is_enabled(self):
+    return self.env.valid
+
   def run(self):
     # self.view_show(self.env.sv, False)
     server_log = os.path.join(self.env.log_root, "server.log")
@@ -1339,6 +1338,20 @@ class EnsimeShowServerMessagesCommand(EnsimeWindowCommand):
     except:
       pass
     self.w.open_file("%s:%d:%d" % (server_log, line, 1), sublime.ENCODED_POSITION)
+
+class EnsimeCreateConfigCommand(EnsimeWindowCommand):
+  def is_enabled(self):
+    return not dotensime.exists(self.w)
+
+  def run(self):
+    dotensime.create(self.w)
+
+class EnsimeEditConfigCommand(EnsimeWindowCommand):
+  def is_enabled(self):
+    return dotensime.exists(self.w)
+
+  def run(self):
+    dotensime.edit(self.w)
 
 class EnsimeShowClientServerReplCommand(ReadyEnsimeOnly, EnsimeWindowCommand):
   def __init__(self, window):
