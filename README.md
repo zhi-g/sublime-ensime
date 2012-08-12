@@ -30,10 +30,7 @@ We'd also love to add debugging facilities at some point in the future.
 
 1. Install the package itself:
 
-    a. If you use [Package Control](http://wbond.net/sublime_packages/package_control),
-    add repository https://github.com/sublimescala/sublime-ensime and install package sublime-ensime.
-
-    b. Otherwise, in your Sublime Text `Packages` dir (you can find it by `Preferences -> Browse Packages`),
+    In your Sublime Text `Packages` dir (you can find it by `Preferences -> Browse Packages`),
 
     ```
     git clone git://github.com/sublimescala/sublime-ensime.git sublime-ensime
