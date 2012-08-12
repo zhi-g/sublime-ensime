@@ -8,6 +8,10 @@
     "command": "ensime_show_server_messages"
   },
   {
+    "caption": "Ensime: Edit Config",
+    "command": "ensime_edit_config"
+  },
+  {
     "caption": "Ensime: Restart",
     "command": "ensime_restart"
   },
