@@ -40,8 +40,9 @@ We'd also love to add debugging facilities at some point in the future.
 
     Download Ensime from http://download.sublimescala.org. 
     The archive will contain a directory with an Ensime version. 
+    
     Extract the contents of this directory into the `server` subdirectory 
-    of just created `sublime-ensime` directory. If you everything correctly,
+    of just created `sublime-ensime` directory. If you do everything correctly,
     `sublime-ensime/server/bin` will contain Ensime startup scripts and
     `sublime-ensime/server/lib` will contain Ensime binaries.
 
