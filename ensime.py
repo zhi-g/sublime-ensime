@@ -1783,12 +1783,19 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
 
       file_name = info.decl_pos.file_name
       contents = None
-      with open(file_name, "r") as f: contents = f.read().decode("utf8")
+      with open(file_name, "rb") as f: contents = f.read().decode("utf8")
       if contents:
-        offset = info.decl_pos.offset
-        line = contents.count('\n', 0, offset) + 1
-        col = offset - contents.rfind('\n', 0, offset)
-        sublime.active_window().open_file("%s:%d:%d" % (file_name, line, col), sublime.ENCODED_POSITION)
+        # doesn't support mixed line endings
+        def detect_newline():
+          if "\n" in contents and "\r" in contents: return "\r\n"
+          if "\n" in contents: return "\n"
+          if "\r" in contents: return "\r"
+          return None
+        zb_offset = info.decl_pos.offset
+        newline = detect_newline()
+        zb_row = contents.count(newline, 0, zb_offset) if newline else 0
+        zb_col = zb_offset - contents.rfind(newline, 0, zb_offset) - len(newline) if newline else zb_offset
+        sublime.active_window().open_file("%s:%d:%d" % (file_name, zb_row + 1, zb_col + 1), sublime.ENCODED_POSITION)
       else:
         statusmessage = "Cannot open " + file_name
         sublime.set_timeout(bind(self.v.set_status, statusgroup, statusmessage), 100)
