@@ -29,7 +29,7 @@ class EnsimeApi:
   def add_notes(self, notes):
     self.env.notes += notes
     for v in self.w.views():
-      EnsimeHighlights(v).add(notes)
+      EnsimeHighlights(v).add_notes(notes)
 
   def clear_notes(self):
     self.env.notes = []
@@ -342,6 +342,9 @@ class EnsimeBase(object):
     root = os.path.realpath(self.env.project_root)
     wannabe = os.path.realpath(filename)
     return wannabe[len(root) + 1:]
+
+  def update_status(self, status):
+    EnsimeHighlights(self.v).update_status(status)
 
 class EnsimeCommon(EnsimeBase, EnsimeLog, EnsimeApi):
   pass
@@ -1502,17 +1505,23 @@ class EnsimeReplNextCommand(EnsimeTextCommand):
     self.repl_insert(self.repl_next_history(), False)
     self.repl_show()
 
+ENSIME_ERROR_OUTLINE_REGION = "ensime-error"
+ENSIME_ERROR_UNDERLINE_REGION = "ensime-error-underline"
+
 class EnsimeHighlights(EnsimeCommon):
 
   def refresh(self):
     self.clear_all()
-    self.add(self.env.notes)
+    if self.env:
+      self.add_notes(self.env.notes)
+    self.update_status()
 
   def clear_all(self):
-    self.v.erase_regions("ensime-error")
-    self.v.erase_regions("ensime-error-underline")
+    self.v.erase_regions(ENSIME_ERROR_OUTLINE_REGION)
+    self.v.erase_regions(ENSIME_ERROR_UNDERLINE_REGION)
+    self.update_status()
 
-  def add(self, notes):
+  def add_notes(self, notes):
     relevant_notes = filter(
       lambda note: self.same_files(note.file_name, self.v.file_name()), notes)
 
@@ -1520,8 +1529,8 @@ class EnsimeHighlights(EnsimeCommon):
     underlines = [sublime.Region(note.start, note.end) for note in relevant_notes]
     if self.env.settings.get("error_highlight") and self.env.settings.get("error_underline"):
       self.v.add_regions(
-        "ensime-error-underline",
-        underlines + self.v.get_regions("ensime-error-underline"),
+        ENSIME_ERROR_UNDERLINE_REGION,
+        underlines + self.v.get_regions(ENSIME_ERROR_UNDERLINE_REGION),
         self.env.settings.get("error_scope", "invalid.illegal"),
         sublime.DRAW_EMPTY_AS_OVERWRITE)
 
@@ -1529,17 +1538,19 @@ class EnsimeHighlights(EnsimeCommon):
     errors = [self.v.full_line(note.start) for note in relevant_notes]
     if self.env.settings.get("error_highlight"):
       self.v.add_regions(
-        "ensime-error",
-        errors + self.v.get_regions("ensime-error"),
+        ENSIME_ERROR_OUTLINE_REGION,
+        errors + self.v.get_regions(ENSIME_ERROR_OUTLINE_REGION),
         self.env.settings.get("error_scope", "invalid.illegal"),
         self.env.settings.get("error_icon", "ensime-error"),
         sublime.DRAW_OUTLINED)
 
+    # Now let's refresh ourselves
+    self.update_status()
 
-class EnsimeHighlightStatus(EnsimeCommon):
-
-  def refresh(self):
-    if self.env.settings.get("error_status"):
+  def update_status(self, custom_status = None):
+    if custom_status:
+      self._update_statusbar(custom_status)
+    elif self.env and self.env.settings.get("error_status"):
       relevant_notes = filter(
         lambda note: self.same_files(
           note.file_name, self.v.file_name()),
@@ -1549,22 +1560,36 @@ class EnsimeHighlightStatus(EnsimeCommon):
       msgs = [note.message for note in relevant_notes
               if (bol <= note.start and note.start <= eol) or
               (bol <= note.end and note.end <= eol)]
-      statusgroup = self.env.settings.get("ensime_statusbar_group", "ensime")
-      if msgs:
-        maxlength = self.env.settings.get("error_status_maxlength", 150)
-        status = "; ".join(msgs)
-        if len(status) > maxlength:
-          status = status[0:maxlength] + "..."
-        sublime.set_timeout(bind(self.v.set_status, statusgroup, status), 100)
-      else:
-        self.v.erase_status(statusgroup)
+      self._update_statusbar("; ".join(msgs))
+    else:
+      self._update_statusbar(None)
 
+  def _update_statusbar(self, status):
+    settings = self.env.settings if self.env else sublime.load_settings("Ensime.sublime-settings")
+    statusgroup = settings.get("ensime_statusbar_group", "ensime")
+    status = str(status)
+    if settings.get("ensime_statusbar_heartbeat_enabled", True):
+      heart_beats = self.env and self.env.valid and self.env.controller and self.env.controller.running
+      if heart_beats and self.v and self.in_project(self.v.file_name()):
+        heartbeat_message = settings.get("ensime_statusbar_heartbeat_message", "ENSIME")
+        if not status:
+          status = heartbeat_message
+        else:
+          heartbeat_joint = settings.get("ensime_statusbar_heartbeat_joint", ": ")
+          status = heartbeat_message + heartbeat_joint + status
+    if status:
+      maxlength = settings.get("ensime_statusbar_maxlength", 150)
+      if len(status) > maxlength:
+        status = status[0:maxlength] + "..."
+      sublime.set_timeout(bind(self.v.set_status, statusgroup, status), 100)
+    else:
+      sublime.set_timeout(bind(self.v.erase_status, statusgroup), 100)
 
 class EnsimeHighlightCommand(ProjectFileOnly, EnsimeWindowCommand):
   def run(self, enable = True):
     self.env.settings.set("error_highlight", not not enable)
     sublime.save_settings("Ensime.sublime-settings")
-    EnsimeHighlights(self.v).hide()
+    EnsimeHighlights(self.v).clear_all()
     if enable:
       self.type_check_file(self.f)
 
@@ -1599,12 +1624,21 @@ class EnsimeHighlightDaemon(EnsimeEventListener):
   def on_post_save(self, view):
     self.with_api(view, lambda api: api.type_check_file(view.file_name()))
 
-  def on_activate(self, view):
-    self.with_api(view, lambda api: EnsimeHighlights(view).refresh())
+  def on_activated(self, view):
+    # todo. EnsimeEnvironment itself creates views (output panels for console logging)
+    # once they are created, they trigger on_activated
+    # which happily instantiates EnsimeHighlights
+    # which calls a constructor of EnsimeEnvironment
+    # which triggers on_activated
+    # <ad infinitum>
+    # I don't know to how disable a highlighting daemon during construction of envs
+    # so I'm adding this good enough check to prevent stack overflows
+    # as a result, switching to empty views won't recalculate ensime status bar
+    if view.file_name() or view.size():
+      EnsimeHighlights(view).refresh()
 
   def on_selection_modified(self, view):
-    if view.sel():
-      self.with_api(view, lambda api: EnsimeHighlightStatus(view).refresh())
+    EnsimeHighlights(view).update_status()
 
 class EnsimeMouseCommand(EnsimeTextCommand):
   def run(self, target):
@@ -1728,15 +1762,13 @@ class EnsimeInspectTypeAtPoint(ProjectFileOnly, EnsimeTextCommand):
     self.inspect_type_at_point(self.f, pos, self.handle_reply)
 
   def handle_reply(self, tpe):
-    statusgroup = self.env.settings.get("ensime_statusbar_group", "ensime")
     if tpe.name != "<notype>":
       summary = tpe.full_name
       if tpe.type_args:
         summary += ("[" + ", ".join(map(lambda t: t.name, tpe.type_args)) + "]")
-      sublime.set_timeout(bind(self.v.set_status, statusgroup, summary), 100)
+      self.update_status(summary)
     else:
-      statusmessage = "Type of the expression at cursor is unknown"
-      sublime.set_timeout(bind(self.v.set_status, statusgroup, statusmessage), 100)
+      self.update_status("Type of the expression at cursor is unknown")
 
 class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
   def run(self, edit, target= None):
@@ -1744,7 +1776,6 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
     self.symbol_at_point(self.f, pos, self.handle_reply)
 
   def handle_reply(self, info):
-    statusgroup = self.env.settings.get("ensime_statusbar_group", "ensime")
     if info.decl_pos:
       # fails from time to time, because sometimes self.w is None
       # v = self.w.open_file(info.decl_pos.file_name)
