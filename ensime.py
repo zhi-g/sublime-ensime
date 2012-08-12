@@ -1622,11 +1622,14 @@ class EnsimeMouseCommand(EnsimeTextCommand):
     is_applicable = not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.connected and self.in_project(self.v.file_name())
     if is_applicable:
       if len(self.diff) == 0:
-        # this is a tough one
-        # here's how we possibly could arrive here
-        # we have a selection, and then ctrl+click on one the active cursors
-        # there's no way we can guess the exact point of click, so we bail
-        pass
+        if len(self.new_sel()) == 1:
+          self.run(self.new_sel()[0].a)
+        else:
+          # this is a tough one
+          # here's how we possibly could arrive here
+          # we have a multi selection, and then ctrl+click on one the active cursors
+          # there's no way we can guess the exact point of click, so we bail
+          pass
       elif len(self.diff) == 1:
         self.run(self.diff[0][0])
       else:
@@ -1770,7 +1773,34 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
         newline = detect_newline()
         zb_row = contents.count(newline, 0, zb_offset) if newline else 0
         zb_col = zb_offset - contents.rfind(newline, 0, zb_offset) - len(newline) if newline else zb_offset
-        sublime.active_window().open_file("%s:%d:%d" % (file_name, zb_row + 1, zb_col + 1), sublime.ENCODED_POSITION)
+        def open_file():
+          return w.open_file("%s:%d:%d" % (file_name, zb_row + 1, zb_col + 1), sublime.ENCODED_POSITION)
+
+        w = self.w or sublime.active_window()
+        g, i = (None, None)
+        if self.v and self.v.file_name() == file_name:
+          # open_file doesn't work, so we have to work around
+          # open_file()
+
+          # <workaround 1> close and then reopen
+          # works fine but is hard on the eyes
+          g, i = w.get_view_index(self.v)
+          self.v.run_command("save")
+          w.run_command("close_file")
+          v = open_file()
+          w.set_view_index(v, g, i)
+
+          # <workaround 2> v.show
+          # has proven to be very unreliable
+          # but let's try and use it
+          # okay it didn't work
+          # offset_in_editor = self.v.text_point(zb_row, zb_col)
+          # region_in_editor = Region(offset_in_editor, offset_in_editor)
+          # self.v.sel().clear()
+          # self.v.sel().add(region_in_editor)
+          # self.v.show(region_in_editor)
+        else:
+          open_file()
       else:
         statusmessage = "Cannot open " + file_name
         sublime.set_timeout(bind(self.v.set_status, statusgroup, statusmessage), 100)
