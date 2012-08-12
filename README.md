@@ -38,7 +38,7 @@ We'd also love to add debugging facilities at some point in the future.
 
 2. Install Ensime.
 
-    Download Ensime from https://download.sublimescala.org. 
+    Download Ensime from http://download.sublimescala.org. 
     The archive will contain a directory with an Ensime version. 
     Extract this directory into the just created `sublime-ensime` directory and rename
     to `server`.
