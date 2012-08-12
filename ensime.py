@@ -1768,11 +1768,23 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
   def handle_reply(self, info):
     statusgroup = self.env.settings.get("ensime_statusbar_group", "ensime")
     if info.decl_pos:
-      #xeno.by: fails from time to time, because sometimes self.w is None
+      # fails from time to time, because sometimes self.w is None
       # v = self.w.open_file(info.decl_pos.file_name)
-      v = sublime.active_window().open_file(info.decl_pos.file_name)
-      v.sel().clear()
-      v.sel().add(Region(info.decl_pos.offset, info.decl_pos.offset))
+
+      # <the first attempt to make it work, gave rise to #31>
+      # v = sublime.active_window().open_file(info.decl_pos.file_name)
+      # # <workaround 1> this one doesn't work, because of the pervasive problem with `show`
+      # # v.sel().clear()
+      # # v.sel().add(Region(info.decl_pos.offset, info.decl_pos.offset))
+      # # v.show(info.decl_pos.offset)
+      # # <workaround 2> this one ignores the second open_file
+      # # row, col = v.rowcol(info.decl_pos.offset)
+      # # sublime.active_window().open_file("%s:%d:%d" % (info.decl_pos.file_name, row + 1, col + 1), sublime.ENCODED_POSITION)
+
+      file_name = info.decl_pos.file_name
+      contents = None
+      with open(file_name, "r") as f: contents = f.read().decode("utf8")
+      lines = contents.splitlines()
     else:
       statusmessage = "Definition of " + str(info.name) + " cannot be found"
       sublime.set_timeout(bind(self.v.set_status, statusgroup, statusmessage), 100)
