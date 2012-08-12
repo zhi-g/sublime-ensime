@@ -30,7 +30,7 @@ We'd also love to add debugging facilities at some point in the future.
 
 1. Install the package itself:
 
-    In your Sublime Text `Packages` dir (you can find it by `Preferences -> Browse Packages`), invoke:
+    In your Sublime Text `Packages` dir (you can find it by `Preferences > Browse Packages`), invoke:
 
     ```
     git clone git://github.com/sublimescala/sublime-ensime.git Ensime
@@ -47,6 +47,17 @@ We'd also love to add debugging facilities at some point in the future.
     `sublime-ensime/server/lib` will contain Ensime binaries.
 
 3. (Re)start Sublime Text editor.
+
+4. Configure Ensime.
+
+    a. Use `Preferences > Package Settings > Ensime` to customize
+       different aspects of this plugin.
+
+    b. If you want to use Ctrl+Click for `Go to Definition`,
+       invoke `Preferences > Package Settings > Mousemap - Default`
+       and either uncomment the relevant entry or copy it to your custom mousemap.
+       (Warning: this is an experimental feature, it might work incorrectly
+       with other Sublime plugins).
 
 ## How to use?
 
