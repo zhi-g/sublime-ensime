@@ -63,20 +63,21 @@ class EnsimeApi:
     return on_complete(ensime_codec.decode_symbol_at_point(payload))
 
   def handle_debug_event(self, event):
-    self.env.debug.event = event
-    if event.type == "start" or event.type == "death" or event.type == "disconnect":
-      self.env.debug.focus = None
-      for v in self.w.views():
-        EnsimeDebug(v).clear_focus()
-    elif event.type == "breakpoint" or event.type == "step":
-      class EnsimeDebugFocus(object): pass
-      self.env.debug.focus = EnsimeDebugFocus()
-      self.env.debug.focus.file_name = event.file_name
-      self.env.debug.focus.line = event.line
-      for v in self.w.views():
-        EnsimeDebug(v).update_focus(self.env.debug.focus)
-      # todo. if the view is not open yet, launch it in sublime and position its the viewport
-    pass
+    if event:
+      self.env.debug.event = event
+      if event.type == "start" or event.type == "death" or event.type == "disconnect":
+        self.env.debug.focus = None
+        for v in self.w.views():
+          EnsimeDebug(v).clear_focus()
+      elif event.type == "breakpoint" or event.type == "step":
+        class EnsimeDebugFocus(object): pass
+        self.env.debug.focus = EnsimeDebugFocus()
+        self.env.debug.focus.file_name = event.file_name
+        self.env.debug.focus.line = event.line
+        for v in self.w.views():
+          EnsimeDebug(v).update_focus(self.env.debug.focus)
+        # todo. if the view is not open yet, launch it in sublime and position its the viewport
+      pass
 
 
 class EnsimeEnvironment(object):
@@ -344,6 +345,9 @@ class EnsimeBase(object):
     return wannabe[len(root) + 1:]
 
   def update_status(self, status):
+    sublime.set_timeout(bind(self.update_status_cont, status), 0)
+
+  def update_status_cont(self, status):
     EnsimeHighlights(self.v).update_status(status)
 
 class EnsimeCommon(EnsimeBase, EnsimeLog, EnsimeApi):
@@ -573,10 +577,12 @@ class EnsimeCodec:
     return True
 
   def decode_notes(self, data):
+    if not data: return []
     m = sexp.sexp_to_key_map(data)
     return [self.decode_note(n) for n in m[":notes"]]
 
   def decode_note(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class EnsimeNote(object): pass
     note = EnsimeNote()
@@ -593,6 +599,7 @@ class EnsimeCodec:
     return [sym("swank:type-at-point"), str(file_path), int(position)]
 
   def decode_inspect_type_at_point(self, data):
+    if not data: return None
     return self.decode_type(data)
 
   def encode_completions(self, file_path, position, max_results):
@@ -605,6 +612,7 @@ class EnsimeCodec:
     return [self.decode_completion(p) for p in m.get(":completions", [])]
 
   def decode_completion(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class EnsimeCompletion(object): pass
     completion = EnsimeCompletion()
@@ -622,9 +630,11 @@ class EnsimeCodec:
     return [sym("swank:patch-source"), file_path, edits]
 
   def decode_symbol_at_point(self, data):
+    if not data: return None
     return self.decode_symbol(data)
 
   def decode_position(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class EnsimePosition(object): pass
     position = EnsimePosition()
@@ -639,6 +649,7 @@ class EnsimeCodec:
     return [self.decode_type(t) for t in data]
 
   def decode_type(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class TypeInfo(object): pass
     info = TypeInfo()
@@ -659,6 +670,7 @@ class EnsimeCodec:
     return info
 
   def decode_symbol(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class SymbolInfo(object): pass
     info = SymbolInfo()
@@ -674,6 +686,7 @@ class EnsimeCodec:
     return [self.decode_member(m) for m in data]
 
   def decode_member(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class MemberInfo(object): pass
     info = MemberInfo()
@@ -685,6 +698,7 @@ class EnsimeCodec:
     return [self.decode_param_section(ps) for ps in data]
 
   def decode_param_section(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class ParamSectionInfo(object): pass
     info = ParamSectionInfo()
@@ -701,6 +715,7 @@ class EnsimeCodec:
     return None
 
   def decode_debug_event(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class EnsimeDebugEvent(object): pass
     event = EnsimeDebugEvent()
@@ -736,6 +751,7 @@ class EnsimeCodec:
     return event
 
   def decode_debug_backtrace(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class EnsimeDebugBacktrace(object): pass
     backtrace = EnsimeDebugBacktrace()
@@ -749,6 +765,7 @@ class EnsimeCodec:
     return [self.decode_debug_frame(f) for f in data]
 
   def decode_debug_stack_frame(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class EnsimeDebugStackFrame(object): pass
     stackframe = EnsimeDebugStackFrame()
@@ -762,6 +779,7 @@ class EnsimeCodec:
     return stackframe
 
   def decode_debug_source_position(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class EnsimeDebugSourcePosition(object): pass
     position = EnsimeDebugSourcePosition()
@@ -774,6 +792,7 @@ class EnsimeCodec:
     return [self.decode_debug_stack_local(loc) for loc in data]
 
   def decode_debug_stack_local(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class EnsimeDebugStackLocal(object): pass
     loc = EnsimeDebugStackLocal()
@@ -784,6 +803,7 @@ class EnsimeCodec:
     return loc
 
   def decode_debug_value(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class EnsimeDebugValue(object): pass
     value = EnsimeDebugValue()
@@ -805,6 +825,7 @@ class EnsimeCodec:
     return [self.decode_debug_object_field(f) for f in data]
 
   def decode_debug_object_field(self, data):
+    if not data: return None
     m = sexp.sexp_to_key_map(data)
     class EnsimeDebugObjectField(object): pass
     field = EnsimeDebugObjectField()
@@ -911,20 +932,17 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     # (:return (:ok (:project-name nil :source-roots ("D:\\Dropbox\\Scratchpad\\Scala"))) 2)
     if reply_type == ":ok":
       payload = payload[1]
-      if payload:
-        if handler:
-          if callable(handler):
-            if call_back_into_ui_thread:
-              sublime.set_timeout(bind(handler, payload), 0)
-            else:
-              handler(payload)
+      if handler:
+        if callable(handler):
+          if call_back_into_ui_thread:
+            sublime.set_timeout(bind(handler, payload), 0)
           else:
-            handler.payload = payload
-            handler.set()
+            handler(payload)
         else:
-          self.log_client("warning: no handler registered for message #" + str(msg_id) + " with payload " + str(payload))
+          handler.payload = payload
+          handler.set()
       else:
-        self.log_client("warning: empty payload received for message #" + str(msg_id))
+        self.log_client("warning: no handler registered for message #" + str(msg_id) + " with payload " + str(payload))
     # (:return (:abort 210 "Error occurred in Analyzer. Check the server log.") 3)
     elif reply_type == ":abort":
       detail = payload[2]
@@ -1656,8 +1674,8 @@ class EnsimeMouseCommand(EnsimeTextCommand):
     is_applicable = not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.connected and self.in_project(self.v.file_name())
     if is_applicable:
       if len(self.diff) == 0:
-        if len(self.new_sel()) == 1:
-          self.run(self.new_sel()[0].a)
+        if len(self.new_sel) == 1:
+          self.run(self.new_sel[0].a)
         else:
           # this is a tough one
           # here's how we possibly could arrive here
@@ -1762,13 +1780,13 @@ class EnsimeInspectTypeAtPoint(ProjectFileOnly, EnsimeTextCommand):
     self.inspect_type_at_point(self.f, pos, self.handle_reply)
 
   def handle_reply(self, tpe):
-    if tpe.name != "<notype>":
+    if tpe and tpe.name != "<notype>":
       summary = tpe.full_name
       if tpe.type_args:
         summary += ("[" + ", ".join(map(lambda t: t.name, tpe.type_args)) + "]")
       self.update_status(summary)
     else:
-      self.update_status("Type of the expression at cursor is unknown")
+      self.update_status("Cannot find out type")
 
 class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
   def run(self, edit, target= None):
@@ -1776,7 +1794,7 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
     self.symbol_at_point(self.f, pos, self.handle_reply)
 
   def handle_reply(self, info):
-    if info.decl_pos:
+    if info and info.decl_pos:
       # fails from time to time, because sometimes self.w is None
       # v = self.w.open_file(info.decl_pos.file_name)
 
@@ -1833,11 +1851,9 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
         else:
           open_file()
       else:
-        statusmessage = "Cannot open " + file_name
-        sublime.set_timeout(bind(self.v.set_status, statusgroup, statusmessage), 100)
+        self.update_status("Cannot open " + file_name)
     else:
-      statusmessage = "Cannot locate " + str(info.name)
-      sublime.set_timeout(bind(self.v.set_status, statusgroup, statusmessage), 100)
+      self.update_status("Cannot locate " + (str(info.name) if info else "symbol"))
 
 class EnsimeDebug(EnsimeCommon):
 
