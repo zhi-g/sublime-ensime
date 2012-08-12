@@ -164,7 +164,7 @@ def mock(window, root):
     ;; After that you can run Tools > Ensime > Maintenance > Startup
     ;; (this command, along with a few others, is also available via the command palette).
 
-    ;; For more information visit http://aemoncannon.github.com/ensime/index.html#tth_sEc3.
+    ;; For more information visit http://docs.sublimescala.org.
     ;; If something doesn't work, feel free to contact us at dev@sublimescala.org.
 
     (

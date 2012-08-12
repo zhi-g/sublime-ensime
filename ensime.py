@@ -877,7 +877,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     self.handle_message(data)
 
   # examples of responses can be seen here:
-  # http://aemoncannon.github.com/ensime/index.html#tth_sEcC.2
+  # http://docs.sublimescala.org
   def handle_message(self, data):
     # (:return (:ok (:pid nil :server-implementation (:name "ENSIMEserver") :machine nil :features nil :version "0.0.1")) 1)
     # (:background-message "Initializing Analyzer. Please wait...")
@@ -1166,7 +1166,7 @@ class EnsimeServer(EnsimeServerListener, EnsimeCommon):
     if not os.path.exists(self.env.ensime_executable):
       message = "ENSIME executable \"" + self.env.ensime_executable + "\" does not exist."
       message += "\n\n"
-      message += "If you haven't yet installed ENSIME, download it from https://github.com/aemoncannon/ensime/downloads, "
+      message += "If you haven't yet installed ENSIME, download it from http://download.sublimescala.org, "
       message += "and unpack it into the \"server\" subfolder of the SublimeEnsime plugin home, which is usually located at " + sublime.packages_path() + os.sep + "sublime-ensime. "
       message += "Your installation is correct if inside the \"server\" subfolder there are folders named \"bin\" and \"lib\"."
       message += "\n\n"
