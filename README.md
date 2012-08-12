@@ -30,7 +30,7 @@ We'd also love to add debugging facilities at some point in the future.
 
 1. Install the package itself:
 
-    In your Sublime Text `Packages` dir (you can find it by `Preferences -> Browse Packages`),
+    In your Sublime Text `Packages` dir (you can find it by `Preferences -> Browse Packages`), invoke:
 
     ```
     git clone git://github.com/sublimescala/sublime-ensime.git sublime-ensime
@@ -38,7 +38,7 @@ We'd also love to add debugging facilities at some point in the future.
 
 2. Install Ensime.
 
-    a. Download Ensime from https://github.com/aemoncannon/ensime/downloads. 
+    Download Ensime from https://github.com/aemoncannon/ensime/downloads. 
     The archive will contain a directory with an Ensime version. 
     Extract this directory into the just created `sublime-ensime` directory and rename
     to `server`.
