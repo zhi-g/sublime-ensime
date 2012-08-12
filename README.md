@@ -12,16 +12,16 @@ and inspired us to kick off the project.
 
 ## Project status
 
-SublimeScala project is an early alpha. Some basic things might work (for example, error highlighting), 
-but basically anything might blow up in your face. Please, submit issues to our tracker 
-if you catch SublimeScala doing that: https://github.com/sublimescala/sublime-ensime/issues/new.
+SublimeScala project is a beta version. Basic things will work (for example, error highlighting), 
+but there might still be problems. Please, submit issues to our tracker 
+if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-ensime/issues/new.
 
-Also note that SublimeScala uses pre-release Scala compiler (which roughly corresponds to 2.10.0-M6). 
+Also note that SublimeScala uses a pre-release Scala compiler (which roughly corresponds to 2.10.0-M6). 
 This might also produce funny bugs. Use our bug reporting facility to report those: 
 https://issues.scala-lang.org/secure/CreateIssue!default.jspa.
 
 Anyways this venture is very important for the project maintainers, since we use Scala every day, 
-so we'll do our best to release something workable before the final release of Scala 2.10.0.
+so we'll do our best to do a polished release around the time of the final release of Scala 2.10.0.
 
 The first release will include go to definition (aka ctrl+click) and on-the-fly error highlighting.
 We'd also love to add debugging facilities at some point in the future.
