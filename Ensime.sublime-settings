@@ -1,6 +1,6 @@
 {
   // crucial settings
-  "ensime_server_path": "sublime-ensime/server",
+  "ensime_server_path": "Ensime/server",
 
   // stylistic settings
   "ensime_statusbar_group": "ensime",

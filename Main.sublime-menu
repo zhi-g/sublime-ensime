@@ -56,7 +56,7 @@
                             {
                                 "command": "open_file", "args":
                                 {
-                                    "file": "${packages}/sublime-ensime/Ensime.sublime-settings"
+                                    "file": "${packages}/Ensime/Ensime.sublime-settings"
                                 },
                                 "caption": "Settings – Default"
                             },
