@@ -12,7 +12,7 @@ and inspired us to kick off the project.
 
 ## Project status
 
-SublimeScala project is a beta version. Basic things will work (for example, error highlighting), 
+This is a beta version. Basic things will work (for example, error highlighting), 
 but there might still be problems. Please, submit issues to our tracker 
 if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-ensime/issues/new.
 
