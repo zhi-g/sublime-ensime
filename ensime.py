@@ -1569,16 +1569,17 @@ class EnsimeHighlights(EnsimeCommon):
     if custom_status:
       self._update_statusbar(custom_status)
     elif self.env and self.env.settings.get("error_status"):
-      relevant_notes = filter(
-        lambda note: self.same_files(
-          note.file_name, self.v.file_name()),
-        self.env.notes)
-      bol = self.v.line(self.v.sel()[0].begin()).begin()
-      eol = self.v.line(self.v.sel()[0].begin()).end()
-      msgs = [note.message for note in relevant_notes
-              if (bol <= note.start and note.start <= eol) or
-              (bol <= note.end and note.end <= eol)]
-      self._update_statusbar("; ".join(msgs))
+      if self.v.sel():
+        relevant_notes = filter(
+          lambda note: self.same_files(
+            note.file_name, self.v.file_name()),
+          self.env.notes)
+        bol = self.v.line(self.v.sel()[0].begin()).begin()
+        eol = self.v.line(self.v.sel()[0].begin()).end()
+        msgs = [note.message for note in relevant_notes
+                if (bol <= note.start and note.start <= eol) or
+                (bol <= note.end and note.end <= eol)]
+        self._update_statusbar("; ".join(msgs))
     else:
       self._update_statusbar(None)
 
@@ -1665,9 +1666,10 @@ class EnsimeMouseCommand(EnsimeTextCommand):
   # note the underscore in "run_"
   def run_(self, args):
     self.old_sel = [(r.a, r.b) for r in self.view.sel()]
-    system_command = args["command"]
-    system_args = dict({"event": args["event"]}.items() + args["args"].items())
-    self.view.run_command(system_command, system_args)
+    system_command = args["command"] if "command" in args else None
+    if system_command:
+      system_args = dict({"event": args["event"]}.items() + args["args"].items())
+      self.view.run_command(system_command, system_args)
     self.new_sel = [(r.a, r.b) for r in self.v.sel()]
     self.diff = list((set(self.old_sel) - set(self.new_sel)) | (set(self.new_sel) - set(self.old_sel)))
 
@@ -1675,7 +1677,7 @@ class EnsimeMouseCommand(EnsimeTextCommand):
     if is_applicable:
       if len(self.diff) == 0:
         if len(self.new_sel) == 1:
-          self.run(self.new_sel[0].a)
+          self.run(self.new_sel[0][0])
         else:
           # this is a tough one
           # here's how we possibly could arrive here
@@ -1683,6 +1685,7 @@ class EnsimeMouseCommand(EnsimeTextCommand):
           # there's no way we can guess the exact point of click, so we bail
           pass
       elif len(self.diff) == 1:
+        self.revert_sel()
         self.run(self.diff[0][0])
       else:
         # this shouldn't happen
@@ -1697,7 +1700,6 @@ class EnsimeMouseCommand(EnsimeTextCommand):
 
 class EnsimeCtrlClick(EnsimeMouseCommand):
   def run(self, target):
-    self.revert_sel()
     self.v.run_command("ensime_go_to_definition", {"target": target})
 
 class EnsimeAltClick(EnsimeMouseCommand):
