@@ -1606,77 +1606,52 @@ class EnsimeHighlightDaemon(EnsimeEventListener):
     if view.sel():
       self.with_api(view, lambda api: EnsimeHighlightStatus(view).refresh())
 
-# things might be simplified as per http://www.sublimetext.com/forum/viewtopic.php?f=6&t=7658
-class EnsimeCtrlClickDaemon(EventListener):
-  def on_activated(self, view):
-    self.save_selection(view)
+class EnsimeMouseCommand(EnsimeTextCommand):
+  def run(self, target):
+    raise Exception("abstract method: EnsimeMouseCommand.run")
 
-  def on_selection_modified(self, view):
-    if view.sel():
-      self.save_selection(view)
+  # note the underscore in "run_"
+  def run_(self, args):
+    self.old_sel = [(r.a, r.b) for r in self.view.sel()]
+    system_command = args["command"]
+    system_args = dict({"event": args["event"]}.items() + args["args"].items())
+    self.view.run_command(system_command, system_args)
+    self.new_sel = [(r.a, r.b) for r in self.v.sel()]
+    self.diff = list((set(self.old_sel) - set(self.new_sel)) | (set(self.new_sel) - set(self.old_sel)))
 
-  def save_selection(self, view):
-    curr_sel = str(view.sel())
-    prev_sel = view.settings().get("curr_sel")
-    if curr_sel != prev_sel:
-      view.settings().set("prev_sel", prev_sel)
-      view.settings().set("curr_sel", curr_sel)
-
-class EnsimeCtrlClick(EnsimeTextCommand):
-  def run(self, edit):
     is_applicable = not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.connected and self.in_project(self.v.file_name())
-    if is_applicable and self.env.settings.get("ctrl_click_goes_to_definition"):
-      #xeno.by: todo. even with all this magic we're not good yet
-      #clicking on one of the current cursor position will confuse this command
-      s_prev = self.view.settings().get("prev_sel")
-      s_curr = self.view.settings().get("curr_sel")
-      prev = self.parse(s_prev)
-      curr = self.parse(s_curr)
-      target = self.diff(prev, curr)
-      diagnostics = "prev_sel = " + str(prev) + ", curr_sel = " + str(curr) + ", diff = " + str(target)
-      if len(target) > 1:
-        raise Exception("something is borked: " + diagnostics)
-      target = target[0][0] if target else prev[0] # won't work with multiselect when prev == curr
-      self.v.sel().clear()
-      for rs in prev:
-        self.v.sel().add(Region(rs[0], rs[1]))
-      self.v.settings().set("prev_sel", s_prev)
-      self.v.settings().set("curr_sel", str(self.v.sel()))
-      self.v.run_command("ensime_go_to_definition", {"target": target})
-      sublime.set_timeout(self.trigger_selection_update, 100)
-    else:
-      # additive drag_select has been applied before this command was called
-      # hence we have nothing to do here
-      pass
+    if is_applicable:
+      if len(self.diff) == 0:
+        # this is a tough one
+        # here's how we possibly could arrive here
+        # we have a selection, and then ctrl+click on one the active cursors
+        # there's no way we can guess the exact point of click, so we bail
+        pass
+      elif len(self.diff) == 1:
+        self.run(self.diff[0][0])
+      else:
+        # this shouldn't happen
+        self.log("len(diff) > 1: command = " + str(type(self)) + ", old_sel = " + str(self.old_sel) + ", new_sel = " + str(self.new_sel))
 
-  def trigger_selection_update(self):
-    #xeno.by: ugly, yes, but we need to trigger a selection update
-    self.v.run_command("move", {"by": "characters", "forward": False})
-    self.v.run_command("move", {"by": "characters", "forward": True})
+  def revert_sel(self):
+    sel = self.view.sel()
+    sel.clear()
+    for old in self.old_sel:
+      a, b = old
+      sel.add(Region(a, b))
 
-  # [(51708, 51708), (51946, 51946)]
-  def parse(self, s_sel):
-    return [(int(m[0]), int(m[1])) for m in re.findall("\((\d+), (\d+)\)", s_sel)]
+class EnsimeCtrlClick(EnsimeMouseCommand):
+  def run(self, target):
+    self.revert_sel()
+    self.v.run_command("ensime_go_to_definition", {"target": target})
 
-  def diff(self, sel1, sel2):
-    return list((set(sel1) - set(sel2)) | (set(sel2) - set(sel1)))
-
-class EnsimeAltClick(EnsimeTextCommand):
-  def run(self, edit):
-    is_applicable = not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.connected and self.in_project(self.v.file_name())
-    if is_applicable and self.env.settings.get("alt_click_inspects_type_at_point"):
-      self.v.run_command("ensime_inspect_type_at_point", {"target": self.v.sel()[0]})
-    else:
-      # subtractive drag_select has been applied before this command was called
-      # hence we have nothing to do here
-      pass
+class EnsimeAltClick(EnsimeMouseCommand):
+  def run(self, target):
+    self.v.run_command("ensime_inspect_type_at_point", {"target": target})
 
 class EnsimeCtrlTilde(EnsimeWindowCommand):
   def run(self):
-    if self.env.settings.get("ctrl_tilde_shows_repl"):
-      self.w.run_command("ensime_show_client_server_repl", {"toggle": True})
-    else:
-      self.w.run_command("hide_panel", {"panel": "console"})
+    self.w.run_command("ensime_show_client_server_repl", {"toggle": True})
 
 
 class EnsimeCompletionsListener(EnsimeEventListener):
@@ -1800,7 +1775,7 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
         statusmessage = "Cannot open " + file_name
         sublime.set_timeout(bind(self.v.set_status, statusgroup, statusmessage), 100)
     else:
-      statusmessage = "Cannot find " + str(info.name)
+      statusmessage = "Cannot locate " + str(info.name)
       sublime.set_timeout(bind(self.v.set_status, statusgroup, statusmessage), 100)
 
 class EnsimeDebug(EnsimeCommon):
