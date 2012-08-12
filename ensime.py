@@ -1784,9 +1784,16 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
       file_name = info.decl_pos.file_name
       contents = None
       with open(file_name, "r") as f: contents = f.read().decode("utf8")
-      lines = contents.splitlines()
+      if contents:
+        offset = info.decl_pos.offset
+        line = contents.count('\n', 0, offset) + 1
+        col = offset - contents.rfind('\n', 0, offset)
+        sublime.active_window().open_file("%s:%d:%d" % (file_name, line, col), sublime.ENCODED_POSITION)
+      else:
+        statusmessage = "Cannot open " + file_name
+        sublime.set_timeout(bind(self.v.set_status, statusgroup, statusmessage), 100)
     else:
-      statusmessage = "Definition of " + str(info.name) + " cannot be found"
+      statusmessage = "Cannot find " + str(info.name)
       sublime.set_timeout(bind(self.v.set_status, statusgroup, statusmessage), 100)
 
 class EnsimeDebug(EnsimeCommon):
