@@ -472,7 +472,7 @@ class EnsimeClientSocket(EnsimeCommon):
         self.log_client("*****    ERROR     *****")
         self.log_client(traceback.format_exc())
         self.connected = False
-        self.status_message("ENSIME server has disconnected")
+        self.status_message("Ensime server has disconnected")
         if self.env.controller:
           self.env.controller.shutdown()
 
@@ -495,8 +495,8 @@ class EnsimeClientSocket(EnsimeCommon):
       return s
     except socket.error as e:
       self.connected = False
-      self.log_client("Cannot connect to ENSIME server:  " + str(e.args))
-      self.status_message("Cannot connect to ENSIME server")
+      self.log_client("Cannot connect to Ensime server:  " + str(e.args))
+      self.status_message("Cannot connect to Ensime server")
       self.env.controller.shutdown()
     finally:
       self._connect_lock.release()
@@ -824,8 +824,8 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     self.handlers = dict((":" + m[0][len("message_"):].replace("_", "-"), (m[1], None, None)) for m in methods)
 
   def startup(self):
-    self.log_client("[" + str(datetime.datetime.now()) + "] Starting ENSIME client")
-    self.log_client("Launching ENSIME client socket at port " + str(self.port))
+    self.log_client("[" + str(datetime.datetime.now()) + "] Starting Ensime client")
+    self.log_client("Launching Ensime client socket at port " + str(self.port))
     self.socket = EnsimeClientSocket(self.owner, self.port, self.timeout, [self, self.env.controller])
     self.socket.connect()
 
@@ -927,7 +927,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
       detail = payload[2]
       if msg_id <= 2: # handshake and initialize project
         self.error_message(self.prettify_error_detail(detail))
-        self.status_message("ENSIME startup has failed")
+        self.status_message("Ensime startup has failed")
         self.env.controller.shutdown()
       else:
         self.status_message(detail)
@@ -1000,7 +1000,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
       self._counterLock.release()
 
   def prettify_error_detail(self, detail):
-    detail = "ENSIME server has encountered a fatal error: " + detail
+    detail = "Ensime server has encountered a fatal error: " + detail
     if detail.endswith(". Check the server log."):
       detail = detail[0:-len(". Check the server log.")]
     if not detail.endswith("."): detail += "."
@@ -1158,19 +1158,19 @@ class EnsimeServer(EnsimeServerListener, EnsimeCommon):
 
   def startup(self):
     ensime_command = self.get_ensime_command()
-    self.log_server("[" + str(datetime.datetime.now()) + "] Starting ENSIME server")
-    self.log_server("Launching ENSIME server process with: " + str(ensime_command))
+    self.log_server("[" + str(datetime.datetime.now()) + "] Starting Ensime server")
+    self.log_server("Launching Ensime server process with: " + str(ensime_command))
     self.proc = EnsimeServerProcess(self.owner, ensime_command, [self, self.env.controller])
 
   def get_ensime_command(self):
     if not os.path.exists(self.env.ensime_executable):
-      message = "ENSIME executable \"" + self.env.ensime_executable + "\" does not exist."
+      message = "Ensime server executable \"" + self.env.ensime_executable + "\" does not exist."
       message += "\n\n"
-      message += "If you haven't yet installed ENSIME, download it from http://download.sublimescala.org, "
+      message += "If you haven't yet installed Ensime server, download it from http://download.sublimescala.org, "
       message += "and unpack it into the \"server\" subfolder of the SublimeEnsime plugin home, which is usually located at " + sublime.packages_path() + os.sep + "sublime-ensime. "
       message += "Your installation is correct if inside the \"server\" subfolder there are folders named \"bin\" and \"lib\"."
       message += "\n\n"
-      message += "If you have already installed ENSIME, check your Ensime.sublime-settings (accessible via Preferences > Package Settings > Ensime) "
+      message += "If you have already installed Ensime server, check your Ensime.sublime-settings (accessible via Preferences > Package Settings > Ensime) "
       message += "and make sure that the \"ensime_server_path\" entry points to a valid location relative to " + sublime.packages_path() + " "
       message += "(currently it points to the path shown above)."
       self.error_message(message)
@@ -1211,7 +1211,7 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
           if not self.port_file:
             message = "\"connect_to_external_server\" in your Ensime.sublime-settings is set to true, "
             message += "however \"external_server_port_file\" is not specified. "
-            message += "Set it to a meaningful value and restart ENSIME."
+            message += "Set it to a meaningful value and restart Ensime."
             sublime.set_timeout(bind(sublime.error_message, message), 0)
             raise Exception("external_server_port_file not specified")
           self.ready = True # external server is deemed to be always ready
@@ -1339,14 +1339,14 @@ class EnsimeShowServerMessagesCommand(EnsimeWindowCommand):
       pass
     self.w.open_file("%s:%d:%d" % (server_log, line, 1), sublime.ENCODED_POSITION)
 
-class EnsimeCreateConfigCommand(EnsimeWindowCommand):
+class EnsimeCreateProjectCommand(EnsimeWindowCommand):
   def is_enabled(self):
     return not dotensime.exists(self.w)
 
   def run(self):
     dotensime.create(self.w)
 
-class EnsimeEditConfigCommand(EnsimeWindowCommand):
+class EnsimeModifyProjectCommand(EnsimeWindowCommand):
   def is_enabled(self):
     return dotensime.exists(self.w)
 

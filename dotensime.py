@@ -41,9 +41,9 @@ def load(window):
   return (None, None, bind(error_no_config, window))
 
 def error_no_config(window):
-  message = "ENSIME server has been unable to start, because a valid .ensime configuration file wasn't found in your project."
+  message = "Ensime has been unable to start, because you haven't yet created an Ensime project in this Sublime workspace."
   message += "\n\n"
-  message += "Sublime will now try to create a configuration file for you. Do you wish to proceed?"
+  message += "Sublime will now try to create a project for you. Do you wish to proceed?"
   if sublime.ok_cancel_dialog(message):
     create(window)
 
@@ -51,7 +51,7 @@ def error_bad_config(window, f, ex):
   exc_type, exc_value, exc_tb = ex
   detailed_info = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
   print detailed_info
-  message = "ENSIME has failed to parse the .ensime configuration file at " + str(f) + " because of the following error: "
+  message = "Ensime has failed to parse the .ensime configuration file at " + str(f) + " because of the following error: "
   message += "\n\n"
   message += str(ex[1])
   message += ("\n" + "(for detailed info refer to Sublime console)")
@@ -67,10 +67,10 @@ def create(window):
 
     def do_create(self):
       if len(self.w.folders()) == 0:
-        message = "ENSIME config cannot be created, because you either don't have a project "
-        message += "or don't have any folders associated with your project."
+        message = "Ensime project cannot be created, because you either don't have a Sublime project "
+        message += "or don't have any folders associated with your Sublime project."
         message += "\n\n"
-        message += "To use ENSIME you need to have an active non-empty project. "
+        message += "To use Ensime you need to have an active non-empty project. "
         message += "Sublime will now try to initialize a project for you. "
         message += "\n\n"
         message += "You will be shown a dialog that will let you select a root folder for the project. "
@@ -83,7 +83,7 @@ def create(window):
           return
 
       if len(self.w.folders()) > 1:
-        message = "ENSIME config (named .ensime) needs to be created in the root of one of your project's folders."
+        message = "A .ensime configuration file needs to be created in one of your project's folders."
         message += "\n\n"
         message += "Since you have multiple folders in the project, pick an appropriate folder in the dialog that will follow."
         sublime.message_dialog(message)
@@ -155,7 +155,7 @@ def mock(window, root):
 
   contents = """
     ;; This is a mock .ensime file created by the sublime-ensime plugin.
-    ;; It covers typical configuration entries necessary to create an Ensime project.
+    ;; It covers typical configuration entries necessary for an Ensime project.
 
     ;; Make sure that :sources contain only the folders that you need in your project,
     ;; and then fill in :compile-deps with a list of libraries your project depends on
