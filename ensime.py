@@ -12,6 +12,7 @@ from types import *
 import env
 import dotensime
 import diff
+import json
 
 def environment_constructor(window):
   return EnsimeEnvironment(window)
@@ -24,7 +25,7 @@ class EnsimeApi:
     self.env.controller.client.async_req(req, wrapped_on_complete, call_back_into_ui_thread = True)
 
   def type_check_file_on_complete_wrapper(self, on_complete, payload):
-    return on_complete(ensime_codec.decode_type_check_file(resp))
+    return on_complete(ensime_codec.decode_type_check_file(payload))
 
   def add_notes(self, notes):
     self.env.notes += notes
@@ -53,7 +54,7 @@ class EnsimeApi:
     req = ensime_codec.encode_completions(file_path, position, max_results)
     timeout = self.env.settings.get("timeout_completion", 0.5)
     resp = self.env.controller.client.sync_req(req, timeout=timeout)
-    if not resp: self.update_status("completion timed out")
+    if not resp: self.status_message("Ensime completion timed out")
     return ensime_codec.decode_completions(resp)
 
   def symbol_at_point(self, file_path, position, on_complete):
@@ -64,62 +65,320 @@ class EnsimeApi:
   def symbol_at_point_on_complete_wrapper(self, on_complete, payload):
     return on_complete(ensime_codec.decode_symbol_at_point(payload))
 
-  def handle_debug_event(self, event):
-    if event:
-      self.env.debug.event = event
-      if event.type == "start" or event.type == "death" or event.type == "disconnect":
-        self.env.debug.focus = None
-        for v in self.w.views():
-          EnsimeHighlights(v).update_debug_focus()
-      elif event.type == "breakpoint" or event.type == "step":
-        class EnsimeDebugFocus(object): pass
-        self.env.debug.focus = EnsimeDebugFocus()
-        self.env.debug.focus.file_name = event.file_name
-        self.env.debug.focus.line = event.line
-        for v in self.w.views():
-          EnsimeHighlights(v).update_debug_focus()
-        # todo. if the view is not open yet, launch it in sublime and position its the viewport
-      pass
+  @property
+  def debugger(self):
+    return self.env.debugger
 
 
 class EnsimeBreakpoint(object):
   def __init__(self, file_name, line):
+    self.file_name = file_name or ""
+    self.line = line or 0
+
+  def is_meaningful(self):
+    return self.file_name != "" or self.line != 0
+
+  def is_valid(self):
+    return not not self.file_name and self.line != None
+
+class EnsimeDebugOutput(object):
+  def __init__(self, debugger):
+    self.debugger = debugger
+    self.contents = ""
+
+  def is_meaningful(self):
+    return self.debugger.online or self.contents
+
+  def clear(self):
+    pass
+
+  def append(self, chunk):
+    pass
+
+  def show(self):
+    pass
+
+class EnsimeDebugFocus(object):
+  def __init__(self, thread_id, thread_name, file_name, line):
+    self.thread_id = thread_id
+    self.thread_name = thread_name
     self.file_name = file_name
     self.line = line
 
-class EnsimeDebugEnvironment(object):
+  def __eq__(self, other):
+    return (type(self) == type(other) and
+           self.thread_id == other.thread_id and
+           self.thread_name == other.thread_name and
+           self.file_name == other.file_name and
+           self.line == other.line)
+
+  def __str__(self):
+    return "%s:%s:%s:%s" % (self.thread_id, self.thread_name, self.file_name, self.line)
+
+class EnsimeDebugDashboard(object):
+  def __init__(self, debugger):
+    self.debugger = debugger
+    self.contents = ""
+
+  def is_meaningful(self):
+    return self.debugger.online or self.contents
+
+  @property
+  def focus(self):
+    return self.debugger.focus
+
+  @property
+  def backtrace(self):
+    pass
+
+  @property
+  def values(self):
+    pass
+
+  def show(self):
+    pass
+
+class EnsimeLaunchConfiguration(object):
+  def __init__(self, name, main_class, args):
+    self.name = name or ""
+    self.main_class = main_class or ""
+    self.args = args or ""
+
+  def is_meaningful(self):
+    return self.name != "" or self.main_class != "" or self.args != ""
+
+  def is_valid(self):
+    return not not self.main_class
+
+  @property
+  def command_line(self):
+    cmdline = self.main_class
+    if self.args:
+      cmdline += (" " + self.args)
+    return cmdline
+
+class EnsimeDebugger(object):
   def __init__(self, env):
     self.env = env
-    self.breakpoints = self.load_breakpoints()
-    self.focus = None
+    self.online = False
     self.event = None
+    self.last_req = None
+    self.steps = 0
+    self.breakpoints = []
+    self.launch_configs = {}
+    self.current_launch_config = None
+    self.output = EnsimeDebugOutput(self)
+    self.focus = None
+    self.dashboard = EnsimeDebugDashboard(self)
+    self.session_file = self.env.project_root + os.sep + ".ensime_session" if self.env.project_root else None
+    self._load_session()
+
+  def _load_session(self):
+    if self.session_file:
+      session = None
+      if os.path.exists(self.session_file):
+        with open(self.session_file, "r") as f:
+          contents = f.read()
+          session = json.loads(contents)
+      session = session or {}
+      self.breakpoints = map(lambda b: EnsimeBreakpoint(b.get("file_name"), b.get("line")), session.get("breakpoints", []))
+      self.breakpoints = filter(lambda b: b.is_meaningful(), self.breakpoints)
+      launch_configs = map(lambda c: EnsimeLaunchConfiguration(c.get("name"), c.get("main_class"), c.get("args")), session.get("launch_configs", []))
+      self.launch_configs = {}
+      # todo. this might lose user data
+      for c in launch_configs: self.launch_configs[c.name] = c
+      self.current_launch_config = session.get("current_launch_config")
+
+  def _save_session(self):
+    if self.session_file:
+      session = {}
+      session["breakpoints"] = map(lambda b: {"file_name": b.file_name, "line": b.line}, self.breakpoints)
+      session["launch_configs"] = map(lambda c: {"name": c.name, "main_class": c.main_class, "args": c.args}, self.launch_configs.values())
+      session["current_launch_config"] = self.current_launch_config
+      if not session["launch_configs"]:
+        # create a dummy launch config, so that the user has easier time filling in the config
+        session["launch_configs"] = [{"name": "", "main_class": "", "args": ""}]
+      contents = json.dumps(session, sort_keys=True, indent=2)
+      with open(self.session_file, "w") as f:
+        f.write(contents)
+
+  def _ensime_debug_set_break(self, file_name, line, on_complete = None):
+    req = ensime_codec.encode_debug_set_break(file_name, line)
+    wrapped_on_complete = bind(self._ensime_debug_set_break_on_complete_wrapper, on_complete) if on_complete else None
+    self.env.controller.client.async_req(req, wrapped_on_complete, call_back_into_ui_thread = True)
+
+  def _ensime_debug_set_break_on_complete_wrapper(self, on_complete, payload):
+    return on_complete(ensime_codec.decode_debug_set_break(payload))
+
+  def _ensime_debug_clear_break(self, file_name, line, on_complete = None):
+    req = ensime_codec.encode_debug_clear_break(file_name, line)
+    wrapped_on_complete = bind(self._ensime_debug_clear_break_on_complete_wrapper, on_complete) if on_complete else None
+    self.env.controller.client.async_req(req, wrapped_on_complete, call_back_into_ui_thread = True)
+
+  def _ensime_debug_clear_break_on_complete_wrapper(self, on_complete, payload):
+    return on_complete(ensime_codec.decode_debug_clear_break(payload))
+
+  def _ensime_debug_clear_all_breaks(self, on_complete = None):
+    req = ensime_codec.encode_debug_clear_all_breaks()
+    wrapped_on_complete = bind(self._ensime_debug_clear_all_breaks_on_complete_wrapper, on_complete) if on_complete else None
+    self.env.controller.client.async_req(req, wrapped_on_complete, call_back_into_ui_thread = True)
+
+  def _ensime_debug_clear_all_breaks_on_complete_wrapper(self, on_complete, payload):
+    return on_complete(ensime_codec.decode_debug_clear_all_breaks(payload))
 
   def toggle_breakpoint(self, file_name, line):
     if file_name:
       old_breakpoints = self.breakpoints
-      new_breakpoints = filter(lambda b: b.file_name != file_name or b.line != line, self.breakpoints)
+      api = ensime_api(self.env.w.active_view())
+      new_breakpoints = filter(lambda b: api.same_files(b.file_name, file_name) or b.line != line, self.breakpoints)
       if len(old_breakpoints) == len(new_breakpoints):
+        # add
         new_breakpoints.append(EnsimeBreakpoint(file_name, line))
+        if self.online: self._ensime_debug_set_break(file_name, line)
+      else:
+        # remove
+        if self.online: self.encode_debug_clear_break(file_name, line)
       self.breakpoints = new_breakpoints
-      self.save_breakpoints()
+      self._save_session()
+      for v in self.env.w.views():
+        EnsimeHighlights(v).update_breakpoints()
 
   def clear_breakpoints(self):
     self.breakpoints = []
-    self.save_breakpoints()
-
-  def load_breakpoints(self):
-    global_settings = sublime.load_settings("Ensime Session.sublime-settings")
-    settings = global_settings.get(self.env.project_root) or {}
-    return map(lambda breakpoint: EnsimeBreakpoint(breakpoint.get("file_name"), breakpoint.get("line")), settings.get("breakpoints", []))
-
-  def save_breakpoints(self):
-    global_settings = sublime.load_settings("Ensime Session.sublime-settings")
-    settings = global_settings.get(self.env.project_root) or {}
-    settings["breakpoints"] = map(lambda breakpoint: {"file_name": breakpoint.file_name, "line": breakpoint.line}, self.breakpoints)
-    global_settings.set(self.env.project_root, settings)
-    sublime.save_settings("Ensime Session.sublime-settings")
+    if self.online: self._ensime_debug_clear_all_breaks()
+    self._save_session()
     for v in self.env.w.views():
       EnsimeHighlights(v).update_breakpoints()
+
+  def _handle(self, event):
+    if event:
+      self.event = event
+      message = None
+
+      if event.type == "start":
+        self.online = True
+        self.steps = 0
+        self.last_req = None
+        self.focus = None
+        self.output.clear()
+        message = "Debugger has successfully started"
+      elif event.type == "death" or event.type == "disconnect":
+        self.online = False
+        self.steps = 0
+        self.last_req = None
+        self.focus = None
+        message = "Debuggee has exited" if event.type == "death" else "Debugger has disconnected"
+      elif event.type == "output":
+        self.output.append(event.body)
+      elif event.type == "exception" or event.type == "breakpoint" or event.type == "step":
+        if event.type == "exception":
+          # todo. how to I get to the details of this exception?
+          rendered = "an exception has been thrown\n"
+          self.output.append(rendered)
+        self.steps += 1
+        old_focus = self.focus
+        new_focus = EnsimeDebugFocus(event.thread_id, event.thread_name, event.file_name, event.line)
+        # if old_focus == new_focus:
+        #   if self.last_req == "step_into":
+        #     self.step_into()
+        #     return
+        #   elif self.last_req == "step_over":
+        #     self.step_over()
+        #     return
+        # print str(new_focus)
+        self.focus = new_focus
+        # message = "(step " + str(self.steps) + ") Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line)
+        message = "Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line)
+
+      if message:
+        api = ensime_api(self.env.w.active_view())
+        api.status_message(message)
+      for v in self.env.w.views():
+        EnsimeHighlights(v).update_status()
+        EnsimeHighlights(v).update_debug_focus()
+
+  def _figure_out_launch_configuration(self):
+    try:
+      self._load_session()
+      config = self.launch_configs[self.current_launch_config]
+      if not config.is_valid():
+        name = self.current_launch_config or "default"
+        raise Exception("Launch configuration \"" + name + "\" is not valid")
+      return config
+    except:
+      message = "Ensime has failed to determine launch configuration stored from a config at " + str(self.session_file) + " because of the following error: "
+      message += "\n\n"
+      exc_type, exc_value, exc_tb = sys.exc_info()
+      detailed_info = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
+      print detailed_info
+      message += (str(exc_type) + ": "+ str(exc_value))
+      message += ("\n" + "(for detailed info refer to Sublime console)")
+      message += "\n\n"
+      message += "Sublime will now open the offending configuration file for you to fix. Do you wish to proceed?"
+      if sublime.ok_cancel_dialog(message):
+        self.env.w.run_command("ensime_modify_session")
+
+  def start(self):
+    config = self._figure_out_launch_configuration()
+    if config:
+      api = ensime_api(self.env.w.active_view())
+      api.status_message("Starting the debugger...")
+      self._ensime_debug_clear_all_breaks(bind(self._start_after_clear_all_breaks, config))
+    else:
+      api = ensime_api(self.env.w.active_view())
+      api.status_message("Bad debug configuration")
+
+  def _start_after_clear_all_breaks(self, config, status):
+    if status:
+      self._start_debug_set_breaks(config, self.breakpoints, status)
+    else:
+      api = ensime_api(self.env.w.active_view())
+      api.status_message("Could not set breakpoints")
+
+  def _start_debug_set_breaks(self, config, breaks, status):
+    if status:
+      if breaks:
+        head = breaks[0]
+        tail = breaks[1:]
+        self._ensime_debug_set_break(head.file_name, head.line, bind(self._start_debug_set_breaks, config, tail))
+      else:
+        self._start_debug_start(config)
+    else:
+      api = ensime_api(self.env.w.active_view())
+      api.status_message("Could not set breakpoints")
+
+  def _start_debug_start(self, config):
+    req = ensime_codec.encode_debug_start(config.command_line)
+    timeout = self.env.settings.get("timeout_debugger", 0.5)
+    data = self.env.controller.client.sync_req(req, timeout=timeout)
+    resp = ensime_codec.decode_debug_start(data)
+    if not resp:
+      api = ensime_api(self.env.w.active_view())
+      if resp == None:
+        api.error_message("Debugger has timed out")
+        api.status_message("Debugger has timed out")
+      else:
+        api.error_message("Cannot start debugger because of " + resp.details)
+        api.status_message("Cannot start debugger")
+
+  def stop(self):
+    req = ensime_codec.encode_debug_stop()
+    self.env.controller.client.async_req(req)
+
+  def step_into(self):
+    self.last_req = "step_into"
+    req = ensime_codec.encode_debug_step(self.focus.thread_id)
+    self.env.controller.client.async_req(req)
+
+  def step_over(self):
+    self.last_req = "step_over"
+    req = ensime_codec.encode_debug_next(self.focus.thread_id)
+    self.env.controller.client.async_req(req)
+
+  def resume(self):
+    self.last_req = "resume"
+    req = ensime_codec.encode_debug_continue(self.focus.thread_id)
+    self.env.controller.client.async_req(req)
 
 
 class EnsimeEnvironment(object):
@@ -155,7 +414,7 @@ class EnsimeEnvironment(object):
 
     # shared state (mutable)
     self.notes = []
-    self.debug = EnsimeDebugEnvironment(self)
+    self.debugger = EnsimeDebugger(self)
     self.repl_last_insert = 0
     self.repl_last_fixup = 0
     self.repl_last_history = -1
@@ -171,6 +430,7 @@ class EnsimeEnvironment(object):
     self.rv.settings().set("word_wrap", True)
     self.curr_sel = None
     self.prev_sel = None
+    self.compiler_ready = False
 
     # Tracks the most recent completion prefix that has been shown to yield empty
     # completion results. Use this so we don't repeatedly hit ensime for results
@@ -368,7 +628,7 @@ class EnsimeBase(object):
       return False
     filename1_normalized = os.path.normcase(os.path.realpath(filename1))
     filename2_normalized = os.path.normcase(os.path.realpath(filename2))
-    return filename1 == filename2
+    return filename1_normalized == filename2_normalized
 
   def in_project(self, filename):
     if filename and filename.endswith("scala"):
@@ -382,12 +642,6 @@ class EnsimeBase(object):
     root = os.path.realpath(self.env.project_root)
     wannabe = os.path.realpath(filename)
     return wannabe[len(root) + 1:]
-
-  def update_status(self, status):
-    sublime.set_timeout(bind(self.update_status_cont, status), 0)
-
-  def update_status_cont(self, status):
-    EnsimeHighlights(self.v).update_status(status)
 
 class EnsimeCommon(EnsimeBase, EnsimeLog, EnsimeApi):
   pass
@@ -432,6 +686,18 @@ class NotRunningOnly:
 class RunningOnly:
   def is_enabled(self):
     return not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.running
+
+class NotDebuggingOnly:
+  def is_enabled(self):
+    return not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.running and not self.debugger.online
+
+class DebuggingOnly:
+  def is_enabled(self):
+    return not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.running and self.debugger.online
+
+class FocusedOnly:
+  def is_enabled(self):
+    return self.debugger.focus
 
 class ReadyEnsimeOnly:
   def is_enabled(self):
@@ -670,7 +936,7 @@ class EnsimeCodec:
     return [sym("swank:symbol-at-point"), str(file_path), int(position)]
 
   def encode_patch_source(self, file_path, edits):
-    return [sym("swank:patch-source"), file_path, edits]
+    return [sym("swank:patch-source"), str(file_path), edits]
 
   def decode_symbol_at_point(self, data):
     if not data: return None
@@ -762,32 +1028,34 @@ class EnsimeCodec:
     m = sexp.sexp_to_key_map(data)
     class EnsimeDebugEvent(object): pass
     event = EnsimeDebugEvent()
-    event.type = m[":type"]
-    if str(event.type) == "output":
+    event.type = str(m[":type"])
+    if event.type == "output":
       event.body = m[":body"]
-    elif str(event.type) == "step":
+    elif event.type == "step":
       event.thread_id = m[":thread-id"]
       event.thread_name = m[":thread-name"]
       event.file_name = m[":file"]
       event.line = m[":line"]
-    elif str(event.type) == "breakpoint":
+    elif event.type == "breakpoint":
       event.thread_id = m[":thread-id"]
       event.thread_name = m[":thread-name"]
       event.file_name = m[":file"]
       event.line = m[":line"]
-    elif str(event.type) == "death":
+    elif event.type == "death":
       pass
-    elif str(event.type) == "start":
+    elif event.type == "start":
       pass
-    elif str(event.type) == "disconnect":
+    elif event.type == "disconnect":
       pass
-    elif str(event.type) == "exception":
+    elif event.type == "exception":
       event.exception_id = m[":exception"]
       event.thread_id = m[":thread-id"]
       event.thread_name = m[":thread-name"]
-    elif str(event.type) == "thread-start":
+      event.file_name = m[":file"]
+      event.line = m[":line"]
+    elif event.type == "threadStart":
       event.thread_id = m[":thread-id"]
-    elif str(event.type) == "thread-death":
+    elif event.type == "threadDeath":
       event.thread_id = m[":thread-id"]
     else:
       raise Exception("unexpected debug event of type " + str(event.type) + ": " + str(m))
@@ -877,6 +1145,56 @@ class EnsimeCodec:
     field.summary = m[":summary"]
     field.type_name = m[":type-name"]
     return field
+
+  def encode_debug_clear_all_breaks(self):
+    return [sym("swank:debug-clear-all-breaks")]
+
+  def decode_debug_clear_all_breaks(self, data):
+    return data
+
+  def encode_debug_set_break(self, file_name, line):
+    return [sym("swank:debug-set-break"), str(file_name), int(line)]
+
+  def decode_debug_set_break(self, data):
+    return data
+
+  def encode_debug_clear_break(self, file_name, line):
+    return [sym("swank:debug-clear-break"), str(file_name), int(line)]
+
+  def decode_debug_clear_break(self, data):
+    return data
+
+  def encode_debug_start(self, command_line):
+    return [sym("swank:debug-start"), str(command_line)]
+
+  def decode_debug_start(self, data):
+    if not data: return None
+    m = sexp.sexp_to_key_map(data)
+    status = m[":status"]
+    if status == "success":
+      return True
+    elif status == "error":
+      class EnsimeDebugStartError(object):
+        def __nonzero__(self):
+          return False
+      error = EnsimeDebugStartError()
+      error.code = m[":error-code"]
+      error.details = m[":details"]
+      return error
+    else:
+      raise Exception("unexpected status: " + str(status))
+
+  def encode_debug_stop(self):
+    return [sym("swank:debug-stop")]
+
+  def encode_debug_continue(self, thread_id):
+    return [sym("swank:debug-continue"), str(thread_id)]
+
+  def encode_debug_step(self, thread_id):
+    return [sym("swank:debug-step"), str(thread_id)]
+
+  def encode_debug_next(self, thread_id):
+    return [sym("swank:debug-next"), str(thread_id)]
 
 ensime_codec = EnsimeCodec()
 
@@ -1013,8 +1331,10 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
     lines = [line.strip() for line in open(filename)]
     msg = lines[random.randint(0, len(lines) - 1)]
     self.status_message(msg + " This could be the start of a beautiful program, " + getpass.getuser().capitalize()  + ".")
-    if self.v and self.in_project(self.v.file_name()):
-      self.v.run_command("save")
+    if self.v:
+      EnsimeHighlights(self.v).refresh()
+      if self.in_project(self.v.file_name()): self.v.run_command("save")
+      self.env.compiler_ready = True
 
   @call_back_into_ui_thread
   def message_indexer_ready(self, msg_id, payload):
@@ -1049,7 +1369,7 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
   @call_back_into_ui_thread
   def message_debug_event(self, msg_id, payload):
     debug_event = ensime_codec.decode_debug_event(payload)
-    self.handle_debug_event(debug_event)
+    self.debugger._handle(debug_event)
 
   def init_counters(self):
     self._counter = 0
@@ -1307,7 +1627,7 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
                           call_back_into_ui_thread = True)
 
   def __response_handshake(self, server_info):
-    self.status_message("Initializing... ")
+    self.status_message("Starting Ensime server... ")
     dotensime.select_subproject(self.env.project_config,
                                 self.owner,
                                 self.__initialize)
@@ -1328,6 +1648,7 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
     try:
       if self.running:
         self.env.in_transition = True
+        self.env.compiler_ready = False
         try:
           sublime.set_timeout(self.clear_notes, 0)
         except:
@@ -1416,6 +1737,16 @@ class EnsimeModifyProjectCommand(EnsimeWindowCommand):
 
   def run(self):
     dotensime.edit(self.w)
+
+class EnsimeModifySessionCommand(EnsimeWindowCommand):
+  def is_enabled(self):
+    return dotensime.exists(self.w)
+
+  def run(self):
+    path = self.debugger.session_file
+    if not [v for v in self.w.views() if self.same_files(v.file_name(), path)]:
+      self.debugger._save_session()
+    self.w.open_file(path)
 
 class EnsimeShowClientServerReplCommand(ReadyEnsimeOnly, EnsimeWindowCommand):
   def __init__(self, window):
@@ -1634,25 +1965,40 @@ class EnsimeHighlights(EnsimeCommon):
       self._update_statusbar(None)
 
   def _update_statusbar(self, status):
+    sublime.set_timeout(bind(self._update_statusbar_callback, status), 100)
+
+  def _update_statusbar_callback(self, status):
     settings = self.env.settings if self.env else sublime.load_settings("Ensime.sublime-settings")
     statusgroup = settings.get("ensime_statusbar_group", "ensime")
     status = str(status)
     if settings.get("ensime_statusbar_heartbeat_enabled", True):
       heart_beats = self.env and self.env.valid and self.env.controller and self.env.controller.running
-      if heart_beats and self.v and self.in_project(self.v.file_name()):
-        heartbeat_message = settings.get("ensime_statusbar_heartbeat_message", "ENSIME")
-        if not status:
-          status = heartbeat_message
-        else:
-          heartbeat_joint = settings.get("ensime_statusbar_heartbeat_joint", ": ")
-          status = heartbeat_message + heartbeat_joint + status
+      if heart_beats:
+        def calculate_heartbeat_message():
+          if self.v and self.in_project(self.v.file_name()):
+            if self.debugger.online:
+              return settings.get("ensime_statusbar_heartbeat_inproject_debugging")
+            else:
+              return settings.get("ensime_statusbar_heartbeat_inproject_normal")
+          else:
+            if self.debugger.online:
+              return settings.get("ensime_statusbar_heartbeat_notinproject_debugging")
+            else:
+              return settings.get("ensime_statusbar_heartbeat_notinproject_normal")
+        heartbeat_message = calculate_heartbeat_message()
+        if heartbeat_message:
+          if not status:
+            status = heartbeat_message
+          else:
+            heartbeat_joint = settings.get("ensime_statusbar_heartbeat_joint")
+            status = heartbeat_message + heartbeat_joint + status
     if status:
       maxlength = settings.get("ensime_statusbar_maxlength", 150)
       if len(status) > maxlength:
         status = status[0:maxlength] + "..."
-      sublime.set_timeout(bind(self.v.set_status, statusgroup, status), 100)
+      self.v.set_status(statusgroup, status)
     else:
-      sublime.set_timeout(bind(self.v.erase_status, statusgroup), 100)
+      self.v.erase_status(statusgroup)
 
   def update_breakpoints(self):
     self.v.erase_regions(ENSIME_BREAKPOINT_REGION)
@@ -1662,7 +2008,7 @@ class EnsimeHighlights(EnsimeCommon):
       relevant_breakpoints = filter(
         lambda breakpoint: self.same_files(
           breakpoint.file_name, self.v.file_name()),
-        self.env.debug.breakpoints)
+        self.debugger.breakpoints)
       regions = [self.v.full_line(self.v.text_point(breakpoint.line - 1, 0))
                  for breakpoint in relevant_breakpoints]
       self.v.add_regions(
@@ -1677,16 +2023,32 @@ class EnsimeHighlights(EnsimeCommon):
     if self.v.is_loading():
       sublime.set_timeout(self.update_debug_focus, 100)
     else:
-      focus = self.env.debug.focus
+      focus = self.debugger.focus
       if focus and self.same_files(focus.file_name, self.v.file_name()):
-        self.v.window().focus_view(self.v)
         focused_region = self.v.full_line(self.v.text_point(focus.line - 1, 0))
-        # todo. also position the viewport correctly
         self.v.add_regions(
           ENSIME_DEBUGFOCUS_REGION,
           [focused_region],
           self.env.settings.get("debugfocus_scope"),
           self.env.settings.get("debugfocus_icon"))
+        w = self.v.window() or sublime.active_window()
+        w.focus_view(self.v)
+        self.update_breakpoints()
+        sublime.set_timeout(bind(self._scroll_viewport, self.v, focused_region), 0)
+
+  def _scroll_viewport(self, v, region):
+    # thanks to Fredrik Ehnbom
+    # see https://github.com/quarnster/SublimeGDB/blob/master/sublimegdb.py
+    # Shouldn't have to call viewport_extent, but it
+    # seems to flush whatever value is stale so that
+    # the following set_viewport_position works.
+    # Keeping it around as a WAR until it's fixed
+    # in Sublime Text 2.
+    v.viewport_extent()
+    # v.set_viewport_position(data, False)
+    v.sel().clear()
+    v.sel().add(region.begin())
+    v.show(region)
 
 class EnsimeHighlightCommand(ProjectFileOnly, EnsimeWindowCommand):
   def run(self, enable = True):
@@ -1742,6 +2104,11 @@ class EnsimeDaemon(EnsimeEventListener):
 
   def on_post_save(self, view):
     self.with_api(view, lambda api: api.type_check_file(view.file_name()))
+    api = ensime_api(view)
+    if api.same_files(view.file_name(), api.debugger.session_file):
+      api.debugger._load_session()
+      for v in api.w.views():
+        EnsimeHighlights(v).update_breakpoints()
 
   def on_activated(self, view):
     # todo. EnsimeEnvironment itself creates views (output panels for console logging)
@@ -1887,9 +2254,9 @@ class EnsimeInspectTypeAtPoint(ProjectFileOnly, EnsimeTextCommand):
       summary = tpe.full_name
       if tpe.type_args:
         summary += ("[" + ", ".join(map(lambda t: t.name, tpe.type_args)) + "]")
-      self.update_status(summary)
+      self.status_message(summary)
     else:
-      self.update_status("Cannot find out type")
+      self.status_message("Cannot find out type")
 
 class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
   def run(self, edit, target= None):
@@ -1954,16 +2321,73 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
         else:
           open_file()
       else:
-        self.update_status("Cannot open " + file_name)
+        self.status_message("Cannot open " + file_name)
     else:
-      self.update_status("Cannot locate " + (str(info.name) if info else "symbol"))
+      self.status_message("Cannot locate " + (str(info.name) if info else "symbol"))
 
 class EnsimeToggleBreakpoint(ProjectFileOnlyMaybeDisconnected, EnsimeTextCommand):
   def run(self, edit):
     if self.v.sel():
       row, col = self.v.rowcol(self.v.sel()[0].begin())
-      self.env.debug.toggle_breakpoint(self.v.file_name(), row + 1)
+      self.debugger.toggle_breakpoint(self.v.file_name(), row + 1)
 
 class EnsimeClearBreakpoints(ProjectFileOnlyMaybeDisconnected, EnsimeTextCommand):
   def run(self, edit):
-    self.env.debug.clear_breakpoints()
+    self.debugger.clear_breakpoints()
+
+class EnsimeStartDebugger(NotDebuggingOnly, EnsimeWindowCommand):
+  def run(self):
+    self.debugger.start()
+
+class EnsimeStopDebugger(DebuggingOnly, EnsimeWindowCommand):
+  def run(self):
+    self.debugger.stop()
+
+class EnsimeStepInto(FocusedOnly, EnsimeWindowCommand):
+  def run(self):
+    self.debugger.step_into()
+
+class EnsimeStepOver(FocusedOnly, EnsimeWindowCommand):
+  def run(self):
+    self.debugger.step_over()
+
+class EnsimeResumeDebugger(FocusedOnly, EnsimeWindowCommand):
+  def run(self):
+    self.debugger.resume()
+
+class EnsimeSmartRunDebugger(EnsimeWindowCommand):
+  def __init__(self, window):
+    super(EnsimeSmartRunDebugger, self).__init__(window)
+    self.startup_attempts = 0
+
+  def is_enabled(self):
+    return not self.debugger.online or self.debugger.focus
+
+  def run(self):
+    if not self.debugger.online:
+      if self.env.compiler_ready:
+        self.startup_attempts = 0
+        self.w.run_command("ensime_start_debugger")
+      else:
+        self.startup_attempts += 1
+        if self.startup_attempts < 5:
+          self.w.run_command("ensime_startup")
+          sublime.set_timeout(self.run, 1000)
+        else:
+          self.startup_attempts = 0
+    if self.debugger.focus:
+      self.w.run_command("ensime_resume_debugger")
+
+class EnsimeShowDebugOutput(EnsimeWindowCommand):
+  def is_enabled(self):
+    return self.debugger.output.is_meaningful()
+
+  def run(self):
+    self.debugger.output.show()
+
+class EnsimeShowDebugDashboard(EnsimeWindowCommand):
+  def is_enabled(self):
+    return self.debugger.dashboard.is_meaningful()
+
+  def run(self):
+    self.debugger.dashboard.show()

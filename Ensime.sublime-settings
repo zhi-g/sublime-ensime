@@ -5,7 +5,10 @@
   // status settings
   "ensime_statusbar_group": "ensime",
   "ensime_statusbar_heartbeat_enabled": true,
-  "ensime_statusbar_heartbeat_message": "ENSIME",
+  "ensime_statusbar_heartbeat_inproject_normal": "ENSIME",
+  "ensime_statusbar_heartbeat_inproject_debugging": "DEBUGGING",
+  "ensime_statusbar_heartbeat_notinproject_normal": "ensime",
+  "ensime_statusbar_heartbeat_notinproject_debugging": "debugging",
   "ensime_statusbar_heartbeat_joint": ": ",
   "ensime_statusbar_maxlength": 150,
   "ensime_statusbar_showerrors": true,
@@ -13,6 +16,7 @@
   // performance settings
   "timeout_sync_roundtrip": 3,
   "timeout_completion": 0.5,
+  "timeout_debugger": 0.5,
 
   // stylistic settings
   "error_highlight": true,
