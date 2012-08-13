@@ -2,8 +2,8 @@
 
 This project provides integration with ENSIME and Sublime Text Editor 2.
 It's a fork of the original sublime-ensime project, written by Ivan Porto Carrero.
-This fork introduces stability improvements, user-friendly setup and error messages,
-better logging and works with the latest pre-release version of Scala 2.10.
+This fork introduces additional features, stability improvements, user-friendly setup and error messages,
+better logging. It also works with the latest pre-release version of Scala 2.10.
 
 Sublime ENSIME strives to realize the dream of having Scala semantic services
 inside a lightning fast and feature-rich text editor. Big thanks to Aemon Cannon,
@@ -23,8 +23,34 @@ https://issues.scala-lang.org/secure/CreateIssue!default.jspa.
 Anyways this venture is very important for the project maintainers, since we use Scala every day,
 so we'll do our best to do a polished release around the time of the final release of Scala 2.10.0.
 
-The first release will include go to definition (aka ctrl+click) and on-the-fly error highlighting.
-We'd also love to add debugging facilities at some point in the future.
+## Features
+
+* Creates and understands `.ensime` projects (maximum one project per Sublime window,
+  if you have a project with multiple subprojects only a single subproject will be available at a time)
+
+* Once your Ensime project is configured (we have a helper for that) and Ensime is run,
+  Scala files in that Ensime project benefit from a number of semantic services:
+
+    * On-the-fly typechecking and error highlighting on save. Error messages are displayed
+      in the status bar when you click highlighted regions (unfortunately, Sublime Text 2 doesn't
+      support programmable tooltips). Moreover, errors can be viewed in a dynamically updated buffer
+      displayed with `Tools > Ensime > Commands > Show notes`.
+
+    * Type-aware completions for identifiers (integrates into the built-in mechanism of completions
+      in Sublime Text 2, depending on your configuration it might be bound to `Ctrl+Space` or `Tab`)
+
+    * Type-aware go to definition (implemented by `ensime_go_to_definition` command: bind it yourself
+      to your favorite hotkey or uncomment an entry in the provided mousemap to bind to `Ctrl+Click`)
+
+* Implements prototype support for debugging. At the moment you can set breakpoints, create launch
+  configurations and step through programs in the debugger. This is a very early prototype,
+  so it's unlikely that you'll be able to do anything useful with it, however it does illustrate
+  future development directions for this plugin
+
+* Hosts ENSIME in a completely transparent fashion. Solves the problem of runaway processes
+  on Windows (Linux and Mac is on to-do list, we also wouldn't mind pull requests)
+
+* Tested on sources of scalac on Windows and Ubuntu (using ENSIME v0.9.6.5 with embedded Scala 2.10.0-M6)
 
 ## How to install?
 
