@@ -2303,27 +2303,29 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
 
           # <workaround 1> close and then reopen
           # works fine but is hard on the eyes
-          g, i = w.get_view_index(self.v)
-          self.v.run_command("save")
-          w.run_command("close_file")
-          v = open_file()
-          w.set_view_index(v, g, i)
+          # g, i = w.get_view_index(self.v)
+          # self.v.run_command("save")
+          # w.run_command("close_file")
+          # v = open_file()
+          # w.set_view_index(v, g, i)
 
           # <workaround 2> v.show
           # has proven to be very unreliable
           # but let's try and use it
-          # okay it didn't work
-          # offset_in_editor = self.v.text_point(zb_row, zb_col)
-          # region_in_editor = Region(offset_in_editor, offset_in_editor)
-          # self.v.sel().clear()
-          # self.v.sel().add(region_in_editor)
-          # self.v.show(region_in_editor)
+          offset_in_editor = self.v.text_point(zb_row, zb_col)
+          region_in_editor = Region(offset_in_editor, offset_in_editor)
+          sublime.set_timeout(bind(self._scroll_viewport, self.v, region_in_editor), 100)
         else:
           open_file()
       else:
         self.status_message("Cannot open " + file_name)
     else:
       self.status_message("Cannot locate " + (str(info.name) if info else "symbol"))
+
+  def _scroll_viewport(self, v, region):
+    v.sel().clear()
+    v.sel().add(region.begin())
+    v.show(region)
 
 class EnsimeToggleBreakpoint(ProjectFileOnlyMaybeDisconnected, EnsimeTextCommand):
   def run(self, edit):
