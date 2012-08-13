@@ -70,23 +70,64 @@ class EnsimeApi:
       if event.type == "start" or event.type == "death" or event.type == "disconnect":
         self.env.debug.focus = None
         for v in self.w.views():
-          EnsimeDebug(v).clear_focus()
+          EnsimeHighlights(v).update_debug_focus()
       elif event.type == "breakpoint" or event.type == "step":
         class EnsimeDebugFocus(object): pass
         self.env.debug.focus = EnsimeDebugFocus()
         self.env.debug.focus.file_name = event.file_name
         self.env.debug.focus.line = event.line
         for v in self.w.views():
-          EnsimeDebug(v).update_focus(self.env.debug.focus)
+          EnsimeHighlights(v).update_debug_focus()
         # todo. if the view is not open yet, launch it in sublime and position its the viewport
       pass
 
 
+class EnsimeBreakpoint(object):
+  def __init__(self, file_name, line):
+    self.file_name = file_name
+    self.line = line
+
+class EnsimeDebugEnvironment(object):
+  def __init__(self, env):
+    self.env = env
+    self.breakpoints = self.load_breakpoints()
+    self.focus = None
+    self.event = None
+
+  def toggle_breakpoint(self, file_name, line):
+    if file_name:
+      old_breakpoints = self.breakpoints
+      new_breakpoints = filter(lambda b: b.file_name != file_name or b.line != line, self.breakpoints)
+      if len(old_breakpoints) == len(new_breakpoints):
+        new_breakpoints.append(EnsimeBreakpoint(file_name, line))
+      self.breakpoints = new_breakpoints
+      self.save_breakpoints()
+
+  def clear_breakpoints(self):
+    self.breakpoints = []
+    self.save_breakpoints()
+
+  def load_breakpoints(self):
+    global_settings = sublime.load_settings("Ensime Session.sublime-settings")
+    settings = global_settings.get(self.env.project_root) or {}
+    return map(lambda breakpoint: EnsimeBreakpoint(breakpoint.get("file_name"), breakpoint.get("line")), settings.get("breakpoints", []))
+
+  def save_breakpoints(self):
+    global_settings = sublime.load_settings("Ensime Session.sublime-settings")
+    settings = global_settings.get(self.env.project_root) or {}
+    settings["breakpoints"] = map(lambda breakpoint: {"file_name": breakpoint.file_name, "line": breakpoint.line}, self.breakpoints)
+    global_settings.set(self.env.project_root, settings)
+    sublime.save_settings("Ensime Session.sublime-settings")
+    for v in self.env.w.views():
+      EnsimeHighlights(v).update_breakpoints()
+
+
 class EnsimeEnvironment(object):
   def __init__(self, window):
-    self.recalc(window)
+    self.w = window
+    self.recalc()
 
-  def recalc(self, window):
+  def recalc(self):
     # plugin-wide stuff (immutable)
     self.settings = sublime.load_settings("Ensime.sublime-settings")
     server_dir = self.settings.get(
@@ -102,7 +143,7 @@ class EnsimeEnvironment(object):
     self.log_root = os.path.normpath(os.path.join(self.plugin_root, "logs"))
 
     # instance-specific stuff (immutable)
-    (root, conf, _) = dotensime.load(window)
+    (root, conf, _) = dotensime.load(self.w)
     self.project_root = root
     self.project_config = conf
     self.valid = self.project_config != None
@@ -114,22 +155,18 @@ class EnsimeEnvironment(object):
 
     # shared state (mutable)
     self.notes = []
-    class EnsimeDebug(object): pass
-    self.debug = EnsimeDebug()
-    self.debug.breakpoints = []
-    self.debug.focus = None
-    self.debug.event = None
+    self.debug = EnsimeDebugEnvironment(self)
     self.repl_last_insert = 0
     self.repl_last_fixup = 0
     self.repl_last_history = -1
     self.repl_lock = threading.RLock()
-    self.sv = window.get_output_panel("ensime_server")
+    self.sv = self.w.get_output_panel("ensime_server")
     self.sv.set_name("ensime_server")
     self.sv.settings().set("word_wrap", True)
-    self.cv = window.get_output_panel("ensime_client")
+    self.cv = self.w.get_output_panel("ensime_client")
     self.cv.set_name("ensime_client")
     self.cv.settings().set("word_wrap", True)
-    self.rv = window.get_output_panel("ensime_repl")
+    self.rv = self.w.get_output_panel("ensime_repl")
     self.rv.set_name("ensime_repl")
     self.rv.settings().set("word_wrap", True)
     self.curr_sel = None
@@ -407,6 +444,10 @@ class ConnectedEnsimeOnly:
 class ProjectFileOnly:
   def is_enabled(self):
     return not self.env.in_transition and self.env.valid and self.env.controller and self.env.controller.connected and self.v and self.in_project(self.v.file_name())
+
+class ProjectFileOnlyMaybeDisconnected:
+  def is_enabled(self):
+    return not self.env.in_transition and self.v and self.in_project(self.v.file_name())
 
 class EnsimeContextProvider(EventListener):
   def on_query_context(self, view, key, operator, operand, match_all):
@@ -1316,7 +1357,7 @@ class EnsimeStartupCommand(NotRunningOnly, EnsimeWindowCommand):
 
   def run(self):
     # refreshes the config (fixes #29)
-    self.env.recalc(self.w)
+    self.env.recalc()
 
     if not self.env.project_config:
       (_, _, error_handler) = dotensime.load(self.w)
@@ -1527,6 +1568,8 @@ class EnsimeReplNextCommand(EnsimeTextCommand):
 
 ENSIME_ERROR_OUTLINE_REGION = "ensime-error"
 ENSIME_ERROR_UNDERLINE_REGION = "ensime-error-underline"
+ENSIME_BREAKPOINT_REGION = "ensime-breakpoint"
+ENSIME_DEBUGFOCUS_REGION = "ensime-debugfocus"
 
 class EnsimeHighlights(EnsimeCommon):
 
@@ -1535,10 +1578,13 @@ class EnsimeHighlights(EnsimeCommon):
     if self.env:
       self.add_notes(self.env.notes)
     self.update_status()
+    self.update_breakpoints()
+    self.update_debug_focus()
 
   def clear_all(self):
     self.v.erase_regions(ENSIME_ERROR_OUTLINE_REGION)
     self.v.erase_regions(ENSIME_ERROR_UNDERLINE_REGION)
+    self.v.erase_regions(ENSIME_DEBUGFOCUS_REGION)
     self.v.run_command("ensime_show_notes", {"refresh_only": True})
     self.update_status()
 
@@ -1552,7 +1598,7 @@ class EnsimeHighlights(EnsimeCommon):
       self.v.add_regions(
         ENSIME_ERROR_UNDERLINE_REGION,
         underlines + self.v.get_regions(ENSIME_ERROR_UNDERLINE_REGION),
-        self.env.settings.get("error_scope", "invalid.illegal"),
+        self.env.settings.get("error_scope"),
         sublime.DRAW_EMPTY_AS_OVERWRITE)
 
     # Outline entire errored line
@@ -1561,8 +1607,8 @@ class EnsimeHighlights(EnsimeCommon):
       self.v.add_regions(
         ENSIME_ERROR_OUTLINE_REGION,
         errors + self.v.get_regions(ENSIME_ERROR_OUTLINE_REGION),
-        self.env.settings.get("error_scope", "invalid.illegal"),
-        self.env.settings.get("error_icon", "ensime-error"),
+        self.env.settings.get("error_scope"),
+        self.env.settings.get("error_icon"),
         sublime.DRAW_OUTLINED)
 
     # Now let's refresh ourselves
@@ -1572,7 +1618,7 @@ class EnsimeHighlights(EnsimeCommon):
   def update_status(self, custom_status = None):
     if custom_status:
       self._update_statusbar(custom_status)
-    elif self.env and self.env.settings.get("error_status"):
+    elif self.env and self.env.settings.get("ensime_statusbar_showerrors"):
       if self.v.sel():
         relevant_notes = filter(
           lambda note: self.same_files(
@@ -1607,6 +1653,40 @@ class EnsimeHighlights(EnsimeCommon):
       sublime.set_timeout(bind(self.v.set_status, statusgroup, status), 100)
     else:
       sublime.set_timeout(bind(self.v.erase_status, statusgroup), 100)
+
+  def update_breakpoints(self):
+    self.v.erase_regions(ENSIME_BREAKPOINT_REGION)
+    if self.v.is_loading():
+      sublime.set_timeout(self.update_breakpoints, 100)
+    else:
+      relevant_breakpoints = filter(
+        lambda breakpoint: self.same_files(
+          breakpoint.file_name, self.v.file_name()),
+        self.env.debug.breakpoints)
+      regions = [self.v.full_line(self.v.text_point(breakpoint.line - 1, 0))
+                 for breakpoint in relevant_breakpoints]
+      self.v.add_regions(
+        ENSIME_BREAKPOINT_REGION,
+        regions,
+        self.env.settings.get("breakpoint_scope"),
+        self.env.settings.get("breakpoint_icon"),
+        sublime.HIDDEN)
+
+  def update_debug_focus(self):
+    self.v.erase_regions(ENSIME_DEBUGFOCUS_REGION)
+    if self.v.is_loading():
+      sublime.set_timeout(self.update_debug_focus, 100)
+    else:
+      focus = self.env.debug.focus
+      if focus and self.same_files(focus.file_name, self.v.file_name()):
+        self.v.window().focus_view(self.v)
+        focused_region = self.v.full_line(self.v.text_point(focus.line - 1, 0))
+        # todo. also position the viewport correctly
+        self.v.add_regions(
+          ENSIME_DEBUGFOCUS_REGION,
+          [focused_region],
+          self.env.settings.get("debugfocus_scope"),
+          self.env.settings.get("debugfocus_icon"))
 
 class EnsimeHighlightCommand(ProjectFileOnly, EnsimeWindowCommand):
   def run(self, enable = True):
@@ -1878,24 +1958,12 @@ class EnsimeGoToDefinition(ProjectFileOnly, EnsimeTextCommand):
     else:
       self.update_status("Cannot locate " + (str(info.name) if info else "symbol"))
 
-class EnsimeDebug(EnsimeCommon):
+class EnsimeToggleBreakpoint(ProjectFileOnlyMaybeDisconnected, EnsimeTextCommand):
+  def run(self, edit):
+    if self.v.sel():
+      row, col = self.v.rowcol(self.v.sel()[0].begin())
+      self.env.debug.toggle_breakpoint(self.v.file_name(), row + 1)
 
-  def refresh(self):
-    self.clear_focus()
-    self.update_focus(self.env.debug.focus)
-
-  def clear_focus(self):
-    self.v.erase_regions("ensime-debugfocus")
-
-  def update_focus(self, focus):
-    if self.same_files(focus.file_name, self.v.file_name()):
-      self.v.window().focus_view(self.v)
-      focused_region = self.v.full_line(self.v.text_point(focus.line, 0))
-      if self.env.settings.get("debugfocus_highlight"):
-        # todo. also position the viewport correctly
-        self.v.add_regions(
-          "ensime-debugfocus",
-          focused_region,
-          self.env.settings.get("debugfocus_scope", "invalid.deprecated"),
-          self.env.settings.get("debugfocus_icon", "ensime-debugfocus"),
-          sublime.DRAW_OUTLINED)
+class EnsimeClearBreakpoints(ProjectFileOnlyMaybeDisconnected, EnsimeTextCommand):
+  def run(self, edit):
+    self.env.debug.clear_breakpoints()

@@ -26,7 +26,9 @@
             [
               { "caption": "Show notes", "command": "ensime_show_notes" },
               { "caption": "Inspect type at point", "command": "ensime_inspect_type_at_point" },
-              { "caption": "Go to definition", "command": "ensime_go_to_definition" }
+              { "caption": "Go to definition", "command": "ensime_go_to_definition" },
+              { "caption": "Toggle breakpoint", "command": "ensime_toggle_breakpoint" },
+              { "caption": "Clear breakpoints", "command": "ensime_clear_breakpoints" }
             ]
           }
         ]
