@@ -51,7 +51,9 @@ class EnsimeApi:
         self.v.file_name(), edits)
       self.env.controller.client.async_req(req)
     req = ensime_codec.encode_completions(file_path, position, max_results)
-    resp = self.env.controller.client.sync_req(req, timeout=0.5)
+    timeout = self.env.settings.get("timeout_completion", 0.5)
+    resp = self.env.controller.client.sync_req(req, timeout=timeout)
+    if not resp: self.update_status("completion timed out")
     return ensime_codec.decode_completions(resp)
 
   def symbol_at_point(self, file_path, position, on_complete):
@@ -1256,7 +1258,7 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
       sublime.set_timeout(bind(self.request_handshake), 0)
 
   def request_handshake(self):
-    timeout = self.env.settings.get("rpc_timeout", 3)
+    timeout = self.env.settings.get("timeout_sync_roundtrip", 3)
     self.client = EnsimeClient(self.owner, self.port_file, timeout)
     self.client.startup()
     self.client.async_req([sym("swank:connection-info")],
@@ -1617,7 +1619,7 @@ class EnsimeHighlightCommand(ProjectFileOnly, EnsimeWindowCommand):
 class EnsimeShowNotesCommand(ProjectFileOnly, EnsimeTextCommand):
   def run(self, edit, refresh_only = False):
     file_name = self.v and self.v.file_name()
-    w = self.v.window()
+    w = self.v.window() or sublime.active_window()
     if file_name:
       ENSIME_NOTES = "Ensime notes"
       wannabes = filter(lambda v: v.name() == ENSIME_NOTES, w.views())
