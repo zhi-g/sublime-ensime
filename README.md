@@ -56,13 +56,17 @@ so we'll do our best to do a polished release around the time of the final relea
 
 1. Install the package itself:
 
-    In your Sublime Text `Packages` dir (you can find it by `Preferences > Browse Packages`), invoke:
+    a. (Not yet available, [coming soon](https://github.com/wbond/package_control_channel/pull/514))
+    If you use [Package Control](http://wbond.net/sublime_packages/package_control), install package Ensime.
+    (`Preferences > Package Control > Install Package > Ensime`).
+
+    b. In your Sublime Text `Packages` dir (you can find it by `Preferences > Browse Packages`), invoke:
 
     ```
     git clone git://github.com/sublimescala/sublime-ensime.git Ensime
     ```
 
-2. Install Ensime.
+2. Install the ENSIME server:
 
     Download Ensime from http://download.sublimescala.org.
     The archive will contain a directory with an Ensime version.
@@ -88,3 +92,17 @@ so we'll do our best to do a polished release around the time of the final relea
 ## How to use?
 
 Open the Sublime command palette (typically bound to `Ctrl+Shift+P`) and type `Ensime: Startup`.
+
+If you don't have an Ensime project, the plugin will guide you through creating it.
+
+If you already have a project, an ENSIME server process will be started in the background,
+and the server will initialize a resident instance of the Scala compiler.
+After the server is ready, a message will appear in the left-hand corner of the status bar.
+It will read either `ENSIME` if the currently opened file belongs to the active Ensime project
+or `ensime` if it doesn't. Keep an eye on this message - it's an indicator of things going well.
+
+## Contacts
+
+In case if something goes wrong, let us know at dev@sublimescala.org or
+submit an issue to the tracker https://github.com/sublimescala/sublime-ensime/issues/new.
+Regards, the SublimeScala team.
