@@ -2120,7 +2120,7 @@ class EnsimeShowNotesCommand(ProjectFileOnly, EnsimeTextCommand):
       edit = v.begin_edit()
       v.replace(edit, Region(0, v.size()), "")
 
-      v.settings().set("result_file_regex", "([:.a-z_A-Z0-9\\\\/-]+[.]scala):([0-9]+)")
+      v.settings().set("result_file_regex", "([:.a-z_A-Z0-9\\\\/-]+[.](?:scala|java)):([0-9]+)")
       v.settings().set("result_line_regex", "")
       v.settings().set("result_base_dir", self.env.project_root)
       if not refresh_only:
