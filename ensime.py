@@ -262,6 +262,7 @@ class EnsimeDebugger(object):
     if event:
       self.event = event
       message = None
+      focus_updated = False
 
       if event.type == "start":
         self.online = True
@@ -295,15 +296,18 @@ class EnsimeDebugger(object):
         #     return
         # print str(new_focus)
         self.focus = new_focus
+        focus_updated = True
         # message = "(step " + str(self.steps) + ") Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line)
         message = "Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line)
 
-      if message:
-        api = ensime_api(self.env.w.active_view())
-        api.status_message(message)
+      if focus_updated:
+        v = self.env.w.open_file("%s:%d:%d" % (self.focus.file_name, self.focus.line, 1), sublime.ENCODED_POSITION)
       for v in self.env.w.views():
         EnsimeHighlights(v).update_status()
         EnsimeHighlights(v).update_debug_focus()
+      if message:
+        api = ensime_api(self.env.w.active_view())
+        api.status_message(message)
 
   def _figure_out_launch_configuration(self):
     if not os.path.exists(self.session_file) or not os.path.getsize(self.session_file):
@@ -1980,6 +1984,9 @@ class EnsimeHighlights(EnsimeCommon):
     # Now let's refresh ourselves
     self.v.run_command("ensime_show_notes", {"refresh_only": True})
     self.update_status()
+    # breakpoints and debug focus should always have priority over red squiggles
+    self.update_breakpoints()
+    self.update_debug_focus()
 
   def update_status(self, custom_status = None):
     if custom_status:
