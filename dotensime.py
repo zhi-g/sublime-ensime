@@ -161,6 +161,10 @@ def mock(window, root):
     ;; and then fill in :compile-deps with a list of libraries your project depends on
     ;; (in .ensime lists are whitespace-separated, not comma-separated).
 
+    ;; :target should point to the location that contains compiled classes for the project.
+    ;; However note that Ensime will not compile the project for you.
+    ;; Use one of the established build tools (Ant, Maven, SBT, etc) to do that.
+
     ;; After that you can run Tools > Ensime > Maintenance > Startup
     ;; (this command, along with a few others, is also available via the command palette).
 
@@ -175,6 +179,7 @@ def mock(window, root):
       :compile-deps (
         ""
       )
+      :target "%s"
     )
   """ % root.replace("\\", "/")
   contents = trim(contents)
