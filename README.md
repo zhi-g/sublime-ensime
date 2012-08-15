@@ -41,6 +41,9 @@ so we'll do our best to do a polished release around the time of the final relea
 
     * Type-aware go to definition (implemented by `ensime_go_to_definition` command: bind it yourself
       to your favorite hotkey or uncomment an entry in the provided mousemap to bind to `Ctrl+Click`)
+      
+* Does not compile the project for you. Use one of the established build tools (Ant,
+  Maven, SBT, etc) to do that.
 
 * Implements prototype support for debugging. At the moment you can set breakpoints, create launch
   configurations and step through programs in the debugger. This is a very early prototype,
@@ -104,6 +107,9 @@ and the server will initialize a resident instance of the Scala compiler.
 After the server is ready, a message will appear in the left-hand corner of the status bar.
 It will read either `ENSIME` if the currently opened file belongs to the active Ensime project
 or `ensime` if it doesn't. Keep an eye on this message - it's an indicator of things going well.
+
+Note that Ensime will not compile the project for you. Use one of the established build tools (Ant,
+Maven, SBT, etc) to do that.
 
 ## Contacts
 
