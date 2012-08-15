@@ -60,11 +60,15 @@ so we'll do our best to do a polished release around the time of the final relea
     If you use [Package Control](http://wbond.net/sublime_packages/package_control), install package Ensime.
     (`Preferences > Package Control > Install Package > Ensime`).
 
-    b. In your Sublime Text `Packages` dir (you can find it by `Preferences > Browse Packages`), invoke:
+    b. In your Sublime Text `Packages` directory, invoke:
 
     ```
     git clone git://github.com/sublimescala/sublime-ensime.git Ensime
     ```
+    
+    You can find the `Packages` directory by opening Sublime, selecting `View > Show Console`
+    and then running the `sublime.packages_path()` command.
+    Make sure you're using the right directory, or the plugin won't work.
 
 2. Install the ENSIME server:
 
@@ -72,9 +76,9 @@ so we'll do our best to do a polished release around the time of the final relea
     The archive will contain a directory with an Ensime version.
 
     Extract the contents of this directory into the `server` subdirectory
-    of just created `sublime-ensime` directory. If you do everything correctly,
-    `sublime-ensime/server/bin` will contain Ensime startup scripts and
-    `sublime-ensime/server/lib` will contain Ensime binaries.
+    of just created `Ensime` directory. If you do everything correctly,
+    `Ensime/server/bin` will contain Ensime startup scripts and
+    `Ensime/server/lib` will contain Ensime binaries.
 
 3. (Re)start Sublime Text editor.
 
