@@ -326,12 +326,19 @@ class EnsimeDebugger(object):
       return None
 
     config_key = self.current_launch_config or ""
-    if config_key: config_name = "launch configuration \"" + config + "\""
+    if config_key: config_name = "launch configuration \"" + config_key + "\""
     else: config_name = "launch configuration"
     config = self.launch_configs.get(config_key, None)
 
     if not config:
-      message = "Your current " + config_name + " is not present in the config. "
+      message = "Your current " + config_name + " is not present. "
+      message += "\n\n"
+      message += "This means that the \"current_launch_config\" field of the config "
+      if config_key: config_status = "set to \"" + config_key + "\""
+      else: config_status = "set to an empty string"
+      message += "(which is currently " + config_status + ") "
+      message += "doesn't correspond to any entries in the \"launch_configs\" field of the config."
+      message += "\n\n"
       message += "Sublime will now open the configuration file for you to fix. Do you wish to proceed?"
       if sublime.ok_cancel_dialog(message):
         self.env.w.run_command("ensime_modify_session")
@@ -339,6 +346,10 @@ class EnsimeDebugger(object):
 
     if not config.is_valid():
       message = "Your current " + config_name + " doesn't specify the main class to start. "
+      message += "\n\n"
+      message += "This means that the entry with \"name\":  \"" + config_key + "\" in the \"launch_configs\" field of the config "
+      message += "does not have the \"main_class\" attribute set."
+      message += "\n\n"
       message += "Sublime will now open the configuration file for you to fix. Do you wish to proceed?"
       if sublime.ok_cancel_dialog(message):
         self.env.w.run_command("ensime_modify_session")
