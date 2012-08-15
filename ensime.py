@@ -167,7 +167,7 @@ class EnsimeDebugger(object):
     self.steps = 0
     self.breakpoints = []
     self.launch_configs = {}
-    self.current_launch_config = None
+    self.current_launch_config = ""
     self.output = EnsimeDebugOutput(self)
     self.focus = None
     self.dashboard = EnsimeDebugDashboard(self)
@@ -176,19 +176,26 @@ class EnsimeDebugger(object):
 
   def _load_session(self):
     if self.session_file:
-      session = None
-      if os.path.exists(self.session_file):
-        with open(self.session_file, "r") as f:
-          contents = f.read()
-          session = json.loads(contents)
-      session = session or {}
-      self.breakpoints = map(lambda b: EnsimeBreakpoint(b.get("file_name"), b.get("line")), session.get("breakpoints", []))
-      self.breakpoints = filter(lambda b: b.is_meaningful(), self.breakpoints)
-      launch_configs = map(lambda c: EnsimeLaunchConfiguration(c.get("name"), c.get("main_class"), c.get("args")), session.get("launch_configs", []))
-      self.launch_configs = {}
-      # todo. this might lose user data
-      for c in launch_configs: self.launch_configs[c.name] = c
-      self.current_launch_config = session.get("current_launch_config")
+      try:
+        session = None
+        if os.path.exists(self.session_file):
+          with open(self.session_file, "r") as f:
+            contents = f.read()
+            session = json.loads(contents)
+        session = session or {}
+        self.breakpoints = map(lambda b: EnsimeBreakpoint(b.get("file_name"), b.get("line")), session.get("breakpoints", []))
+        self.breakpoints = filter(lambda b: b.is_meaningful(), self.breakpoints)
+        launch_configs = map(lambda c: EnsimeLaunchConfiguration(c.get("name"), c.get("main_class"), c.get("args")), session.get("launch_configs", []))
+        self.launch_configs = {}
+        # todo. this might lose user data
+        for c in launch_configs: self.launch_configs[c.name] = c
+        self.current_launch_config = session.get("current_launch_config") or ""
+        return True
+      except:
+        print "Ensime: " + str(self.session_file) + " has failed to load"
+        exc_type, exc_value, exc_tb = sys.exc_info()
+        detailed_info = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        print detailed_info
 
   def _save_session(self):
     if self.session_file:
@@ -299,25 +306,45 @@ class EnsimeDebugger(object):
         EnsimeHighlights(v).update_debug_focus()
 
   def _figure_out_launch_configuration(self):
-    try:
-      self._load_session()
-      config = self.launch_configs[self.current_launch_config]
-      if not config.is_valid():
-        name = self.current_launch_config or "default"
-        raise Exception("Launch configuration \"" + name + "\" is not valid")
-      return config
-    except:
-      message = "Ensime has failed to determine launch configuration stored from a config at " + str(self.session_file) + " because of the following error: "
+    if not os.path.exists(self.session_file) or not os.path.getsize(self.session_file):
+      message = "Launch configuration does not exist. "
+      message += "Sublime will now create a configuration file for you. Do you wish to proceed?"
+      if sublime.ok_cancel_dialog(message):
+        self._save_session()
+        self.env.w.run_command("ensime_modify_session")
+      return None
+
+    if not self._load_session():
+      message = "Launch configuration could not be loaded. "
+      message += "Maybe the config is not accessible, but most likely it's simply not a valid JSON. "
       message += "\n\n"
-      exc_type, exc_value, exc_tb = sys.exc_info()
-      detailed_info = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
-      print detailed_info
-      message += (str(exc_type) + ": "+ str(exc_value))
-      message += ("\n" + "(for detailed info refer to Sublime console)")
-      message += "\n\n"
-      message += "Sublime will now open the offending configuration file for you to fix. Do you wish to proceed?"
+      message += "Sublime will now open the configuration file for you to fix. "
+      message += "If you don't know how to fix the config, delete it and Sublime will recreate it from scratch. "
+      message += "Do you wish to proceed?"
       if sublime.ok_cancel_dialog(message):
         self.env.w.run_command("ensime_modify_session")
+      return None
+
+    config_key = self.current_launch_config or ""
+    if config_key: config_name = "launch configuration \"" + config + "\""
+    else: config_name = "launch configuration"
+    config = self.launch_configs.get(config_key, None)
+
+    if not config:
+      message = "Your current " + config_name + " is not present in the config. "
+      message += "Sublime will now open the configuration file for you to fix. Do you wish to proceed?"
+      if sublime.ok_cancel_dialog(message):
+        self.env.w.run_command("ensime_modify_session")
+      return None
+
+    if not config.is_valid():
+      message = "Your current " + config_name + " doesn't specify the main class to start. "
+      message += "Sublime will now open the configuration file for you to fix. Do you wish to proceed?"
+      if sublime.ok_cancel_dialog(message):
+        self.env.w.run_command("ensime_modify_session")
+      return None
+
+    return config
 
   def start(self):
     config = self._figure_out_launch_configuration()
@@ -1743,8 +1770,6 @@ class EnsimeModifySessionCommand(EnsimeWindowCommand):
 
   def run(self):
     path = self.debugger.session_file
-    if not [v for v in self.w.views() if self.same_files(v.file_name(), path)]:
-      self.debugger._save_session()
     self.w.open_file(path)
 
 class EnsimeShowClientServerReplCommand(ReadyEnsimeOnly, EnsimeWindowCommand):
