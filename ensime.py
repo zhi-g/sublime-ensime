@@ -33,10 +33,17 @@ class EnsimeApi:
     for v in self.w.views():
       EnsimeHighlights(v).add_notes(notes)
 
-  def clear_notes(self):
-    self.env.notes = []
+  def clear_notes(self, flavor = "all"):
+    if flavor == "all":
+      self.env.notes = []
+    elif flavor == "java":
+      self.env.notes = filter(lambda n: not n.file_name.endswith(".java"), self.env.notes)
+    elif flavor == "scala":
+      self.env.notes = filter(lambda n: not n.file_name.endswith(".scala"), self.env.notes)
+    else:
+      print "unknown flavor of notes: " + str(flavor)
     for v in self.w.views():
-      EnsimeHighlights(v).clear_all()
+      EnsimeHighlights(v).refresh()
 
   def inspect_type_at_point(self, file_path, position, on_complete):
     req = ensime_codec.encode_inspect_type_at_point(file_path, position)
@@ -672,7 +679,7 @@ class EnsimeBase(object):
     return filename1_normalized == filename2_normalized
 
   def in_project(self, filename):
-    if filename and filename.endswith("scala"):
+    if filename and (filename.endswith("scala") or filename.endswith("java")):
       root = os.path.normcase(os.path.realpath(self.env.project_root))
       wannabe = os.path.normcase(os.path.realpath(filename))
       return wannabe.startswith(root)
@@ -715,10 +722,6 @@ class EnsimeEventListener(EventListener):
       return what(api)
     else:
       return default
-
-class ScalaOnly:
-  def is_enabled(self):
-    return self.w and self.v and self.v.file_name() and self.v.file_name().lower().endswith(".scala")
 
 class NotRunningOnly:
   def is_enabled(self):
@@ -1392,7 +1395,8 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
 
   @call_back_into_ui_thread
   def message_java_notes(self, msg_id, payload):
-    pass
+    notes = ensime_codec.decode_notes(payload)
+    self.add_notes(notes)
 
   @call_back_into_ui_thread
   def message_scala_notes(self, msg_id, payload):
@@ -1401,11 +1405,11 @@ class EnsimeClient(EnsimeClientListener, EnsimeCommon):
 
   @call_back_into_ui_thread
   def message_clear_all_java_notes(self, msg_id, payload):
-    pass
+    self.clear_notes(flavor = "java")
 
   @call_back_into_ui_thread
   def message_clear_all_scala_notes(self, msg_id, payload):
-    self.clear_notes()
+    self.clear_notes(flavor = "scala")
 
   @call_back_into_ui_thread
   def message_debug_event(self, msg_id, payload):
