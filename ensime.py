@@ -1667,6 +1667,12 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
             message += "Set it to a meaningful value and restart Ensime."
             sublime.set_timeout(bind(sublime.error_message, message), 0)
             raise Exception("external_server_port_file not specified")
+          if not os.path.exists(self.port_file):
+            message = "\"connect_to_external_server\" in your Ensime.sublime-settings is set to true, "
+            message += ("however \"external_server_port_file\" is set to a non-existent file \"" + self.port_file + "\" . ")
+            message += "Check the configuration and restart Ensime."
+            sublime.set_timeout(bind(sublime.error_message, message), 0)
+            raise Exception("external_server_port_file not specified")
           self.ready = True # external server is deemed to be always ready
           sublime.set_timeout(bind(self.request_handshake), 0)
         else:
