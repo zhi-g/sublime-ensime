@@ -7,6 +7,8 @@ from sexp.sexp import key, sym
 import functools
 from functools import partial as bind
 import traceback
+import os
+import paths
 
 def locations(window):
   """Intelligently guess the appropriate .ensime file locations for the
@@ -24,7 +26,7 @@ def load(window):
   Return: (inferred project root directory, config sexp)
   """
   for f in locations(window):
-    root = os.path.dirname(f)
+    root = paths.encode_path(os.path.dirname(f))
     src = "()"
     with open(f) as open_file:
       src = open_file.read()

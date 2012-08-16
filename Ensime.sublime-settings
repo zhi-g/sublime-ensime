@@ -32,5 +32,6 @@
   "log_to_console": [],
   "log_to_file": ["ui", "client", "server"],
   "connect_to_external_server": false,
-  "external_server_port_file": ""
+  "external_server_port_file": "",
+  "os_independent_paths_in_dot_ensime": false
 }

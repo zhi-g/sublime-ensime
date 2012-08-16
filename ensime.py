@@ -14,6 +14,7 @@ import dotensime
 import diff
 import json
 import datetime
+import paths
 
 def environment_constructor(window):
   return EnsimeEnvironment(window)
@@ -41,7 +42,7 @@ class EnsimeApi:
     elif flavor == "scala":
       self.env.notes = filter(lambda n: not n.file_name.endswith(".scala"), self.env.notes)
     else:
-      print "unknown flavor of notes: " + str(flavor)
+      raise Exception("unknown flavor of notes: " + str(flavor))
     for v in self.w.views():
       EnsimeHighlights(v).refresh()
 
@@ -190,7 +191,7 @@ class EnsimeDebugger(object):
             contents = f.read()
             session = json.loads(contents)
         session = session or {}
-        self.breakpoints = map(lambda b: EnsimeBreakpoint(b.get("file_name"), b.get("line")), session.get("breakpoints", []))
+        self.breakpoints = map(lambda b: EnsimeBreakpoint(paths.decode_path(b.get("file_name")), b.get("line")), session.get("breakpoints", []))
         self.breakpoints = filter(lambda b: b.is_meaningful(), self.breakpoints)
         launch_configs = map(lambda c: EnsimeLaunchConfiguration(c.get("name"), c.get("main_class"), c.get("args")), session.get("launch_configs", []))
         self.launch_configs = {}
@@ -207,7 +208,7 @@ class EnsimeDebugger(object):
   def _save_session(self):
     if self.session_file:
       session = {}
-      session["breakpoints"] = map(lambda b: {"file_name": b.file_name, "line": b.line}, self.breakpoints)
+      session["breakpoints"] = map(lambda b: {"file_name": paths.encode_path(b.file_name), "line": b.line}, self.breakpoints)
       session["launch_configs"] = map(lambda c: {"name": c.name, "main_class": c.main_class, "args": c.args}, self.launch_configs.values())
       session["current_launch_config"] = self.current_launch_config
       if not session["launch_configs"]:
@@ -436,6 +437,29 @@ class EnsimeEnvironment(object):
     self.w = window
     self.recalc()
 
+  @property
+  def project_root(self):
+    return paths.decode_path(self._project_root)
+
+  @property
+  def project_config(self):
+    config = self._project_config
+    if self.settings.get("os_independent_paths_in_dot_ensime"):
+      if type(config) == list:
+        i = 0
+        while i < len(config):
+          key = config[i]
+          literal_keys = [":root-dir", ":target"]
+          list_keys = [":compile-deps", ":compile-jars", ":runtime-deps", ":runtime-jars", ":test-deps", ":sources"]
+          if str(key) in literal_keys:
+            config[i + 1] = paths.decode_path(config[i + 1])
+          elif str(key) in list_keys:
+            config[i + 1] = map(lambda path: paths.decode_path(path), config[i + 1])
+          else:
+            pass
+          i += 2
+    return config
+
   def recalc(self):
     # plugin-wide stuff (immutable)
     self.settings = sublime.load_settings("Ensime.sublime-settings")
@@ -453,8 +477,8 @@ class EnsimeEnvironment(object):
 
     # instance-specific stuff (immutable)
     (root, conf, _) = dotensime.load(self.w)
-    self.project_root = root
-    self.project_config = conf
+    self._project_root = root
+    self._project_config = conf
     self.valid = self.project_config != None
 
     # lifecycle (mutable)
