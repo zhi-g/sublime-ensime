@@ -162,11 +162,17 @@ def mock(window, root):
     ;; (in .ensime lists are whitespace-separated, not comma-separated).
 
     ;; :target should point to the location that contains compiled classes for the project.
+    ;; Ensime will use this location for completions and debugging.
     ;; However note that Ensime will not compile the project for you.
     ;; Use one of the established build tools (Ant, Maven, SBT, etc) to do that.
 
     ;; After that you can run Tools > Ensime > Maintenance > Startup
     ;; (this command, along with a few others, is also available via the command palette).
+
+    ;; If your project contains a lot of files, it is advisable to enable :disable-source-load-on-startup t.
+    ;; Otherwise Ensime might incur a massive lag at startup time.
+    ;; At some point this scenario will be documented, but for now please contact us directly.
+    ;; For Scala development use .ensime.SAMPLE from https://github.com/scala/scala.
 
     ;; For more information visit http://docs.sublimescala.org.
     ;; If something doesn't work, feel free to contact us at dev@sublimescala.org.
