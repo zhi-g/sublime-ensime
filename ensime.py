@@ -132,6 +132,9 @@ class EnsimeDebugDashboard(object):
   def is_meaningful(self):
     return self.debugger.online or self.contents
 
+  def clear(self):
+    pass
+
   @property
   def focus(self):
     return self.debugger.focus
@@ -176,11 +179,25 @@ class EnsimeDebugger(object):
     self.breakpoints = []
     self.launch_configs = {}
     self.current_launch_config = ""
+    self.active_launch_config = None
     self.output = EnsimeDebugOutput(self)
     self.focus = None
     self.dashboard = EnsimeDebugDashboard(self)
     self.session_file = self.env.project_root + os.sep + ".ensime_session" if self.env.project_root else None
     self._load_session()
+
+  def shutdown(self):
+    self.online = False
+    self._clean_slate()
+
+  def _clean_slate(self, erase_output = True, erase_dashboard = True):
+    self.event = None
+    self.last_req = None
+    self.steps = 0
+    self.active_launch_config = None
+    self.focus = None
+    if erase_output: self.output.clear()
+    if erase_dashboard: self.dashboard.clear()
 
   def _load_session(self):
     if self.session_file:
@@ -274,16 +291,13 @@ class EnsimeDebugger(object):
 
       if event.type == "start":
         self.online = True
-        self.steps = 0
-        self.last_req = None
-        self.focus = None
-        self.output.clear()
+        active_launch_config = self.active_launch_config
+        self._clean_slate()
+        self.active_launch_config = active_launch_config
         message = "Debugger has successfully started"
       elif event.type == "death" or event.type == "disconnect":
         self.online = False
-        self.steps = 0
-        self.last_req = None
-        self.focus = None
+        self._clean_slate(erase_output = False, erase_dashboard = False) # so that people can take a look later
         message = "Debuggee has exited" if event.type == "death" else "Debugger has disconnected"
       elif event.type == "output":
         self.output.append(event.body)
@@ -308,6 +322,7 @@ class EnsimeDebugger(object):
         # message = "(step " + str(self.steps) + ") Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line)
         message = "Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line)
 
+      self.event = event
       if focus_updated:
         v = self.env.w.open_file("%s:%d:%d" % (self.focus.file_name, self.focus.line, 1), sublime.ENCODED_POSITION)
       for v in self.env.w.views():
@@ -411,6 +426,8 @@ class EnsimeDebugger(object):
       else:
         api.error_message("Cannot start debugger because of " + resp.details)
         api.status_message("Cannot start debugger")
+    else:
+      self.active_launch_config = config.name
 
   def stop(self):
     req = ensime_codec.encode_debug_stop()
@@ -1725,6 +1742,11 @@ class EnsimeController(EnsimeCommon, EnsimeClientListener, EnsimeServerListener)
         self.env.in_transition = True
         self.env.compiler_ready = False
         try:
+          self.env.debugger.shutdown()
+        except:
+          self.log("Error shutting down ensime debugger:")
+          self.log(traceback.format_exc())
+        try:
           sublime.set_timeout(self.clear_notes, 0)
         except:
           self.log("Error shutting down ensime UI:")
@@ -2051,18 +2073,23 @@ class EnsimeHighlights(EnsimeCommon):
       heart_beats = self.env and self.env.valid and self.env.controller and self.env.controller.running
       if heart_beats:
         def calculate_heartbeat_message():
+          def format_debugging_message(msg):
+            active_config = (self.debugger.active_launch_config or "") if self.debugger.online else ""
+            try: return msg % active_config
+            except: return msg
           if self.v and self.in_project(self.v.file_name()):
             if self.debugger.online:
-              return settings.get("ensime_statusbar_heartbeat_inproject_debugging")
+              return format_debugging_message(settings.get("ensime_statusbar_heartbeat_inproject_debugging"))
             else:
               return settings.get("ensime_statusbar_heartbeat_inproject_normal")
           else:
             if self.debugger.online:
-              return settings.get("ensime_statusbar_heartbeat_notinproject_debugging")
+              return format_debugging_message(settings.get("ensime_statusbar_heartbeat_notinproject_debugging"))
             else:
               return settings.get("ensime_statusbar_heartbeat_notinproject_normal")
         heartbeat_message = calculate_heartbeat_message()
         if heartbeat_message:
+          heartbeat_message = heartbeat_message.strip()
           if not status:
             status = heartbeat_message
           else:
