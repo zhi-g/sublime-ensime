@@ -34,5 +34,6 @@
   "log_to_file": ["ui", "client", "server"],
   "connect_to_external_server": false,
   "external_server_port_file": "",
-  "os_independent_paths_in_dot_ensime": false
+  "os_independent_paths_in_dot_ensime": false,
+  "min_ensime_server_version": "0.9.8"
 }
