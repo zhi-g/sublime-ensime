@@ -2,7 +2,7 @@ import sublime
 from sublime import *
 from sublime_plugin import *
 import os, threading, thread, socket, getpass, signal
-import subprocess, killableprocess, tempfile, datetime, time
+import subprocess, tempfile, datetime, time
 import functools, inspect, traceback, random, re
 from functools import partial as bind
 from sexp import sexp
@@ -480,15 +480,14 @@ class EnsimeEnvironment(object):
   def recalc(self):
     # plugin-wide stuff (immutable)
     self.settings = sublime.load_settings("Ensime.sublime-settings")
-    server_dir = self.settings.get(
-      "ensime_server_path",
-      "sublime_ensime" + os.sep + "server")
+    server_dir = self.settings.get("ensime_server_path", "Ensime" + os.sep + "server")
     self.server_path = (server_dir
                         if os.path.isabs(server_dir)
                         else os.path.join(sublime.packages_path(), server_dir))
     self.ensime_executable = (self.server_path + os.sep +
                               ("bin\\server.bat" if os.name == 'nt'
                                else "bin/server"))
+    self.ensime_args = self.settings.get("ensime_server_args")
     self.plugin_root = os.path.normpath(os.path.join(self.server_path, ".."))
     self.log_root = os.path.normpath(os.path.join(self.plugin_root, "logs"))
 
@@ -1491,98 +1490,32 @@ class EnsimeServerProcess(EnsimeCommon):
     self.killed = False
     self.listeners = listeners or []
 
-    # ensure the subprocess is always killed when the editor exits
-    # this doesn't work, so we have to go for hacks below
-    # import atexit
-    # atexit.register(self.kill)
-
-    # HACK #1: kill ensime servers that are already running and were launched by this instance of sublime
-    # this can happen when you press ctrl+s on sublime-ensime files, sublime reloads them
-    # and suddenly SublimeServerCommand has a new singleton instance, and a process it hosts becomes a zombie
-    processes = self.env.settings.get("processes", {})
-    previous = processes.get(str(os.getpid()), None)
-    if previous:
-      self.log_server("killing orphaned ensime server process with pid " + str(previous))
-      try:
-        if os.name == "nt":
-          job_name = "Global\\sublime-ensime-" + str(os.getpid())
-          self.log_server("killing a job named: " + job_name)
-          job = killableprocess.winprocess.OpenJobObject(0x1F001F, True, job_name)
-          killableprocess.winprocess.TerminateJobObject(job, 127)
-        else:
-          os.killpg(int(previous), signal.SIGKILL)
-      except:
-        self.log_server(sys.exc_info()[1])
-
-    # HACK #2: garbage collect ensime server processes that were started by sublimes, but weren't stopped
-    # unfortunately, atexit doesn't work (see the commented code above), so we have to resort to this ugliness
-    # todo. ideally, this should happen automatically from ensime
-    # e.g. if -Densime.explode.when.zombied is set, then ensime automatically quits when it becomes a zombie
-    if os.name == "nt":
-      import ctypes
-      EnumWindows = ctypes.windll.user32.EnumWindows
-      EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
-      GetWindowText = ctypes.windll.user32.GetWindowTextW
-      GetWindowTextLength = ctypes.windll.user32.GetWindowTextLengthW
-      IsWindowVisible = ctypes.windll.user32.IsWindowVisible
-      GetWindowThreadProcessId = ctypes.windll.user32.GetWindowThreadProcessId
-      active_sublimes = set()
-      def foreach_window(hwnd, lParam):
-        if IsWindowVisible(hwnd):
-          length = GetWindowTextLength(hwnd)
-          buff = ctypes.create_unicode_buffer(length + 1)
-          GetWindowText(hwnd, buff, length + 1)
-          title = buff.value
-          if title.endswith("- Sublime Text 2"):
-            pid = ctypes.c_int()
-            tid = GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-            active_sublimes.add(pid.value)
-        return True
-      EnumWindows(EnumWindowsProc(foreach_window), 0)
-      for sublimepid in [sublimepid for sublimepid in processes.keys() if not int(sublimepid) in active_sublimes]:
-        ensimepid = processes[sublimepid]
-        del processes[sublimepid]
-        self.log_server("found a zombie ensime server process with pid " + str(ensimepid))
-        try:
-          # todo. Duh, this no longer works on Windows, but I swear it worked.
-          # Due to an unknown reason, job gets killed once Sublime quits, so we have no way to dispose of the zombies later.
-          job_name = "Global\\sublime-ensime-" + str(sublimepid)
-          self.log_server("killing a job named: " + job_name)
-          job = killableprocess.winprocess.OpenJobObject(0x1F001F, True, job_name)
-          killableprocess.winprocess.TerminateJobObject(job, 127)
-        except:
-          self.log_server(sys.exc_info()[1])
-    else:
-      # todo. Vlad, please, implement similar logic for Linux
-      pass
+    env = os.environ.copy()
+    args = self.env.ensime_args or "-Xms256M -Xmx1512M -XX:PermSize=128m -Xss1M -Dfile.encoding=UTF-8"
+    if not "-Densime.explode.on.disconnect" in args: args += " -Densime.explode.on.disconnect=1"
+    env["ENSIME_JVM_ARGS"] = str(args) # unicode not supported here
 
     if os.name =="nt":
-      startupinfo = killableprocess.STARTUPINFO()
-      startupinfo.dwFlags |= killableprocess.STARTF_USESHOWWINDOW
+      startupinfo = subprocess.STARTUPINFO()
+      startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
       startupinfo.wShowWindow |= 1 # SW_SHOWNORMAL
       creationflags = 0x8000000 # CREATE_NO_WINDOW
-      self.proc = killableprocess.Popen(
+      self.proc = subprocess.Popen(
         command,
         stdout = subprocess.PIPE,
         stderr = subprocess.PIPE,
         startupinfo = startupinfo,
         creationflags = creationflags,
-        env = os.environ.copy(),
+        env = env,
         cwd = self.env.server_path)
     else:
-      self.proc = killableprocess.Popen(
+      self.proc = subprocess.Popen(
         command,
         stdout = subprocess.PIPE,
         stderr = subprocess.PIPE,
-        env = os.environ.copy(),
+        env = env,
         cwd = self.env.server_path)
     self.log_server("started ensime server with pid " + str(self.proc.pid))
-    processes[str(os.getpid())] = str(self.proc.pid)
-    self.env.settings.set("processes", processes)
-    # todo. this will leak pids if there are multiple sublimes launching ensimes simultaneously
-    # and, in general, we should also address the fact that sublime-ensime assumes at most single ensime per window
-    # finally, it's unclear whether to allow multiple ensimes for the same project launched by different sublimes
-    sublime.save_settings("Ensime.sublime-settings")
 
     if self.proc.stdout:
       thread.start_new_thread(self.read_stdout, ())
@@ -1629,7 +1562,7 @@ class EnsimeServer(EnsimeServerListener, EnsimeCommon):
   def startup(self):
     ensime_command = self.get_ensime_command()
     self.log_server("[" + str(datetime.datetime.now()) + "] Starting Ensime server")
-    self.log_server("Launching Ensime server process with: " + str(ensime_command))
+    self.log_server("Launching Ensime server process with command = " + str(ensime_command) + " and args = " + str(self.env.ensime_args))
     self.proc = EnsimeServerProcess(self.owner, ensime_command, [self, self.env.controller])
 
   def get_ensime_command(self):
