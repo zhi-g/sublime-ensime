@@ -2,8 +2,7 @@ import sublime
 from sublime import *
 from sublime_plugin import *
 import sexp
-from sexp import sexp
-from sexp.sexp import key, sym
+from sexp import key, sym
 import functools
 from functools import partial as bind
 import traceback

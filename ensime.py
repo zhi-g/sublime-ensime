@@ -5,8 +5,8 @@ import os, threading, thread, socket, getpass, signal
 import subprocess, tempfile, datetime, time
 import functools, inspect, traceback, random, re
 from functools import partial as bind
-from sexp import sexp
-from sexp.sexp import key, sym
+import sexp
+from sexp import key, sym
 from string import strip
 from types import *
 import env
