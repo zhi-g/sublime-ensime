@@ -263,7 +263,7 @@ class EnsimeDebugger(object):
     if file_name:
       old_breakpoints = self.breakpoints
       api = ensime_api(self.env.w.active_view())
-      new_breakpoints = filter(lambda b: api.same_files(b.file_name, file_name) or b.line != line, self.breakpoints)
+      new_breakpoints = filter(lambda b: not (api.same_files(b.file_name, file_name) and b.line == line), self.breakpoints)
       if len(old_breakpoints) == len(new_breakpoints):
         # add
         new_breakpoints.append(EnsimeBreakpoint(file_name, line))
