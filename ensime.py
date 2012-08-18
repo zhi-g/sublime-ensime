@@ -307,21 +307,24 @@ class EnsimeDebugger(object):
           # todo. how to I get to the details of this exception?
           rendered = "an exception has been thrown\n"
           self.output.append(rendered)
-        self.steps += 1
-        old_focus = self.focus
-        new_focus = EnsimeDebugFocus(event.thread_id, event.thread_name, event.file_name, event.line)
-        # if old_focus == new_focus:
-        #   if self.last_req == "step_into":
-        #     self.step_into()
-        #     return
-        #   elif self.last_req == "step_over":
-        #     self.step_over()
-        #     return
-        # print str(new_focus)
-        self.focus = new_focus
-        focus_updated = True
-        # message = "(step " + str(self.steps) + ") Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line)
-        message = "Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line)
+        # sometimes thrown exceptions don't have file_name and/or line set
+        # I think it's best to ignore them for the time being
+        if event.file_name and event.line:
+          self.steps += 1
+          old_focus = self.focus
+          new_focus = EnsimeDebugFocus(event.thread_id, event.thread_name, event.file_name, event.line)
+          # if old_focus == new_focus:
+          #   if self.last_req == "step_into":
+          #     self.step_into()
+          #     return
+          #   elif self.last_req == "step_over":
+          #     self.step_over()
+          #     return
+          # print str(new_focus)
+          self.focus = new_focus
+          focus_updated = True
+          # message = "(step " + str(self.steps) + ") Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line)
+          message = "Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line)
 
       self.event = event
       if focus_updated:
