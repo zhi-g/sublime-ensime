@@ -468,7 +468,7 @@ class EnsimeEnvironment(object):
         while i < len(config):
           key = config[i]
           literal_keys = [":root-dir", ":target"]
-          list_keys = [":compile-deps", ":compile-jars", ":runtime-deps", ":runtime-jars", ":test-deps", ":sources"]
+          list_keys = [":compile-deps", ":compile-jars", ":runtime-deps", ":runtime-jars", ":test-deps", ":sources", ":reference-source-roots"]
           if str(key) in literal_keys:
             config[i + 1] = paths.decode_path(config[i + 1])
           elif str(key) in list_keys:
@@ -2411,9 +2411,11 @@ class EnsimeToggleBreakpoint(ProjectFileOnlyMaybeDisconnected, EnsimeTextCommand
       row, col = self.v.rowcol(self.v.sel()[0].begin())
       self.debugger.toggle_breakpoint(self.v.file_name(), row + 1)
 
-class EnsimeClearBreakpoints(ProjectFileOnlyMaybeDisconnected, EnsimeTextCommand):
+class EnsimeClearBreakpoints(EnsimeTextCommand):
   def run(self, edit):
-    self.debugger.clear_breakpoints()
+    self.debugger._load_session()
+    if self.debugger.breakpoints and sublime.ok_cancel_dialog("This will delete all breakpoints. Do you wish to continue?"):
+      self.debugger.clear_breakpoints()
 
 class EnsimeStartDebugger(NotDebuggingOnly, EnsimeWindowCommand):
   def run(self):
