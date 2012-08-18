@@ -2109,6 +2109,7 @@ class EnsimeHighlights(EnsimeCommon):
           self.env.settings.get("breakpoint_scope"),
           self.env.settings.get("breakpoint_icon"),
           sublime.HIDDEN)
+          # sublime.DRAW_OUTLINED)
 
   def update_debug_focus(self):
     self.v.erase_regions(ENSIME_DEBUGFOCUS_REGION)
@@ -2184,7 +2185,7 @@ class EnsimeShowNotesCommand(ProjectFileOnly, EnsimeTextCommand):
         message = note.message
         diagnostics = ": ".join(str(x) for x in [loc, severity, message])
         v.insert(edit, v.size(), diagnostics + "\n")
-        v.insert(edit, v.size(), self.v.substr(self.v.full_line(note.start)))
+        v.insert(edit, v.size(), self.v.substr(self.v.line(note.start)) + "\n")
         v.insert(edit, v.size(), " " * (note.col - 1) + "^" + "\n")
       v.end_edit(edit)
       v.sel().clear()
@@ -2209,6 +2210,24 @@ class EnsimeDaemon(EnsimeEventListener):
 
   def on_selection_modified(self, view):
     EnsimeHighlights(view).update_status()
+
+  def on_modified(self, view):
+    rs = view.get_regions("ensime-breakpoint")
+    if rs:
+      def update_breakpoint_positions(api):
+        irrelevant_breakpoints = filter(
+          lambda b: not api.same_files(b.file_name, view.file_name()),
+          api.debugger.breakpoints)
+        def new_breakpoint_position(r):
+          lines = view.lines(r)
+          if lines:
+            (linum, _) = view.rowcol(lines[0].begin())
+            return EnsimeBreakpoint(view.file_name(), linum + 1)
+        relevant_breakpoints = filter(lambda b: b, map(new_breakpoint_position, rs))
+        api.debugger.breakpoints = irrelevant_breakpoints + relevant_breakpoints
+        api.debugger._save_session()
+        EnsimeHighlights(view).update_breakpoints()
+      update_breakpoint_positions(ensime_api(view))
 
 class EnsimeMouseCommand(EnsimeTextCommand):
   def run(self, target):
