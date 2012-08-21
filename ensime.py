@@ -18,11 +18,13 @@ class EnsimeCommon(object):
     self.owner = owner
     if type(owner) == Window:
       self._env = env.for_window(owner)
+      self._recalc_session_id()
       self.w = owner
     elif type(owner) == View:
-      # todo. find out why this is necessary
+      # todo. find out why owner.window() is sometimes None
       w = owner.window() or sublime.active_window()
       self._env = env.for_window(w)
+      self._recalc_session_id()
       self.w = w
       self.v = owner
     else:
@@ -32,7 +34,11 @@ class EnsimeCommon(object):
   def env(self):
     if not self._env:
       self._env = env.for_window(self.w)
+      self._recalc_session_id()
     return self._env
+
+  def _recalc_session_id(self):
+    self.session_id = self._env.session_id if self._env else None
 
   @property
   def rpc(self):
@@ -54,6 +60,8 @@ class EnsimeCommon(object):
     sublime.set_timeout(bind(self.log_on_ui_thread, "server", data), 0)
 
   def log_on_ui_thread(self, flavor, data):
+    if flavor in self.env.settings.get("log_to_console", {}):
+      print data.strip()
     if flavor in self.env.settings.get("log_to_file", {}):
       try:
         if not os.path.exists(self.env.log_root):
@@ -183,6 +191,9 @@ class EnsimeMouseCommand(EnsimeTextCommand):
   def run(self, target):
     raise Exception("abstract method: EnsimeMouseCommand.run")
 
+  def is_applicable(self):
+    return self.is_running() and self.in_project()
+
   def _run_underlying(self, args):
     system_command = args["command"] if "command" in args else None
     if system_command:
@@ -191,8 +202,7 @@ class EnsimeMouseCommand(EnsimeTextCommand):
 
   # note the underscore in "run_"
   def run_(self, args):
-    is_applicable = self.is_running() and self.in_project()
-    if is_applicable:
+    if self.is_applicable():
       self.old_sel = [(r.a, r.b) for r in self.v.sel()]
       # unfortunately, running an additive drag_select is our only way of getting the coordinates of the click
       # I didn't find a way to convert args["event"]["x"] and args["event"]["y"] to text coordinates
@@ -367,7 +377,9 @@ class ClientSocket(EnsimeCommon):
         self.log_client(traceback.format_exc())
         self.connected = False
         self.status_message("Ensime server has disconnected")
-        self.env.controller.shutdown()
+        # todo. do we need to check session_ids somewhere else as well?
+        if self.env.session_id == self.session_id:
+          self.env.controller.shutdown()
 
   def start_receiving(self):
     t = threading.Thread(name = "ensime-client-" + str(self.w.id()) + "-" + str(self.port), target = self.receive_loop)
@@ -428,8 +440,7 @@ class Client(ClientListener, EnsimeCommon):
     return self.socket.connect()
 
   def shutdown(self):
-    if self.socket.connected:
-      self.sync_req([sym("swank:shutdown-server")])
+    if self.socket.connected: self.rpc.shutdown_server()
     self.socket.close()
     self.socket = None
 
@@ -1236,6 +1247,9 @@ class Notes(EnsimeToolView):
     return "\n".join(lines)
 
 class EnsimeAltClick(EnsimeMouseCommand):
+  def is_applicable(self):
+    return self.env.settings.get("alt_click_inspects_type_at_point") and super(EnsimeAltClick, self).is_applicable()
+
   def run(self, target):
     self.v.run_command("ensime_inspect_type_at_point", {"target": target})
 
@@ -1257,6 +1271,9 @@ class EnsimeInspectTypeAtPoint(RunningProjectFileOnly, EnsimeTextCommand):
       self.status_message("Cannot find out type")
 
 class EnsimeCtrlClick(EnsimeMouseCommand):
+  def is_applicable(self):
+    return self.env.settings.get("ctrl_click_goes_to_definition") and super(EnsimeCtrlClick, self).is_applicable()
+
   def run(self, target):
     self.v.run_command("ensime_go_to_definition", {"target": target})
 
@@ -1357,7 +1374,7 @@ class EnsimeClearBreakpoints(EnsimeWindowCommand):
     self.env.load_session()
     if self.env.breakpoints and sublime.ok_cancel_dialog("This will delete all breakpoints. Do you wish to continue?"):
       self.env.breakpoints = []
-      if self.online: self.rpc.clear_all_breaks()
+      if self.env.profile: self.rpc.clear_all_breaks()
       self.env.save_session()
       self.redraw_all_breakpoints()
 
