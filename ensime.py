@@ -113,17 +113,17 @@ class EnsimeCommon(object):
       colorer = Colorer(v)
       getattr(colorer, method)(*args)
 
-  def colorize(self, view = "default"): self._invoke_view_colorer("refresh", view)
-  def colorize_all(self): self._invoke_all_colorers("refresh")
-  def uncolorize(self, view = "default"): self._invoke_view_colorer("clear_all", view)
-  def uncolorize_all(self): self._invoke_all_colorers("clear_all")
-  def redraw_highlights(self, view = "default"): self._invoke_view_colorer("update_highlights", view)
-  def redraw_all_highlights(self): self._invoke_all_colorers("update_highlights")
-  def redraw_status(self, view = "default"): self._invoke_view_colorer("update_status", view)
-  def redraw_breakpoints(self, view = "default"): self._invoke_view_colorer("update_breakpoints", view)
-  def redraw_all_breakpoints(self): self._invoke_all_colorers("update_breakpoints")
-  def redraw_debug_focus(self, view = "default"): self._invoke_view_colorer("update_debug_focus", view)
-  def redraw_all_debug_focuses(self): self._invoke_all_colorers("update_debug_focus")
+  def colorize(self, view = "default"): self._invoke_view_colorer("colorize", view)
+  def colorize_all(self): self._invoke_all_colorers("colorize")
+  def uncolorize(self, view = "default"): self._invoke_view_colorer("uncolorize", view)
+  def uncolorize_all(self): self._invoke_all_colorers("uncolorize")
+  def redraw_highlights(self, view = "default"): self._invoke_view_colorer("redraw_highlights", view)
+  def redraw_all_highlights(self): self._invoke_all_colorers("redraw_highlights")
+  def redraw_status(self, view = "default"): self._invoke_view_colorer("redraw_status", view)
+  def redraw_breakpoints(self, view = "default"): self._invoke_view_colorer("redraw_breakpoints", view)
+  def redraw_all_breakpoints(self): self._invoke_all_colorers("redraw_breakpoints")
+  def redraw_debug_focus(self, view = "default"): self._invoke_view_colorer("redraw_debug_focus", view)
+  def redraw_all_debug_focuses(self): self._invoke_all_colorers("redraw_debug_focus")
 
 class EnsimeWindowCommand(EnsimeCommon, WindowCommand):
   def __init__(self, window):
@@ -917,22 +917,22 @@ class Daemon(EnsimeEventListener):
 
 class Colorer(EnsimeCommon):
 
-  def refresh(self):
-    self.clear_all()
-    self.update_highlights()
-    self.update_status()
-    self.update_breakpoints()
-    self.update_debug_focus()
+  def colorize(self):
+    self.uncolorize()
+    self.redraw_highlights()
+    self.redraw_status()
+    self.redraw_breakpoints()
+    self.redraw_debug_focus()
 
-  def clear_all(self):
+  def uncolorize(self):
     self.v.erase_regions(ENSIME_ERROR_OUTLINE_REGION)
     self.v.erase_regions(ENSIME_ERROR_UNDERLINE_REGION)
     # don't erase breakpoints, they should be permanent regardless of whether ensime is running or not
     # self.v.erase_regions(ENSIME_BREAKPOINT_REGION)
     self.v.erase_regions(ENSIME_DEBUGFOCUS_REGION)
-    self.update_status()
+    self.redraw_status()
 
-  def update_highlights(self):
+  def redraw_highlights(self):
     self.v.erase_regions(ENSIME_ERROR_OUTLINE_REGION)
     self.v.erase_regions(ENSIME_ERROR_UNDERLINE_REGION)
 
@@ -963,10 +963,10 @@ class Colorer(EnsimeCommon):
       self.redraw_status()
 
       # breakpoints and debug focus should always have priority over red squiggles
-      self.update_breakpoints()
-      self.update_debug_focus()
+      self.redraw_breakpoints()
+      self.redraw_debug_focus()
 
-  def update_status(self, custom_status = None):
+  def redraw_status(self, custom_status = None):
     if custom_status:
       self._update_statusbar(custom_status)
     elif self.env and self.env.settings.get("ensime_statusbar_showerrors"):
@@ -1023,10 +1023,10 @@ class Colorer(EnsimeCommon):
     else:
       self.v.erase_status(statusgroup)
 
-  def update_breakpoints(self):
+  def redraw_breakpoints(self):
     self.v.erase_regions(ENSIME_BREAKPOINT_REGION)
     if self.v.is_loading():
-      sublime.set_timeout(self.update_breakpoints, 100)
+      sublime.set_timeout(self.redraw_breakpoints, 100)
     else:
       if self.env:
         relevant_breakpoints = filter(
@@ -1043,10 +1043,10 @@ class Colorer(EnsimeCommon):
           sublime.HIDDEN)
           # sublime.DRAW_OUTLINED)
 
-  def update_debug_focus(self):
+  def redraw_debug_focus(self):
     self.v.erase_regions(ENSIME_DEBUGFOCUS_REGION)
     if self.v.is_loading():
-      sublime.set_timeout(self.update_debug_focus, 100)
+      sublime.set_timeout(self.redraw_debug_focus, 100)
     else:
       if self.env and self.env.focus and same_paths(self.env.focus.file_name, self.v.file_name()):
           focused_region = self.v.full_line(self.v.text_point(self.env.focus.line - 1, 0))
@@ -1057,7 +1057,7 @@ class Colorer(EnsimeCommon):
             self.env.settings.get("debugfocus_icon"))
           w = self.v.window() or sublime.active_window()
           w.focus_view(self.v)
-          self.update_breakpoints()
+          self.redraw_breakpoints()
           sublime.set_timeout(bind(self._scroll_viewport, self.v, focused_region), 0)
 
   def _scroll_viewport(self, v, region):
@@ -1206,7 +1206,7 @@ class EnsimeHighlight(RunningOnly, EnsimeWindowCommand):
   def run(self, enable = True):
     self.env.settings.set("error_highlight", not not enable)
     sublime.save_settings("Ensime.sublime-settings")
-    self.refresh_all_highlights()
+    self.colorize_all()
 
 ############################## SUBLIME COMMANDS: DEVELOPMENT ##############################
 
