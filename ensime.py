@@ -434,7 +434,7 @@ class Client(ClientListener, EnsimeCommon):
     self.handlers = dict((":" + m[0][len("message_"):].replace("_", "-"), (m[1], None, None)) for m in methods)
 
   def startup(self):
-    self.log_client("Starting Ensime client")
+    self.log_client("Starting Ensime client (plugin version is " + (self.env.settings.get("plugin_version") or "unknown") + ")")
     self.log_client("Launching Ensime client socket at port " + str(self.port))
     self.socket = ClientSocket(self.owner, self.port, self.timeout, [self, self.env.controller])
     return self.socket.connect()
@@ -711,7 +711,7 @@ class Server(ServerListener, EnsimeCommon):
   def startup(self):
     ensime_command = self.get_ensime_command()
     if self.get_ensime_command() and self.verify_ensime_version():
-      self.log_server("Starting Ensime server")
+      self.log_server("Starting Ensime server (plugin version is " + (self.env.settings.get("plugin_version") or "unknown") + ")")
       self.log_server("Launching Ensime server process with command = " + str(ensime_command) + " and args = " + str(self.env.ensime_args))
       self.proc = ServerProcess(self.owner, ensime_command, [self, self.env.controller])
       return True
