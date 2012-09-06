@@ -59,11 +59,11 @@ so we'll do our best to do a polished release around the time of the final relea
 
 1. Install the package itself:
 
-    a. (Not yet available, [coming soon](https://github.com/wbond/package_control_channel/pull/514))
-    If you use [Package Control](http://wbond.net/sublime_packages/package_control), install package Ensime.
+    a. If you use [Package Control](http://wbond.net/sublime_packages/package_control), install package Ensime.
     (`Preferences > Package Control > Install Package > Ensime`).
 
-    b. In your Sublime Text `Packages` directory, invoke:
+    b. Otherwise install manually.
+       In your Sublime Text `Packages` directory, invoke:
 
     ```
     git clone git://github.com/sublimescala/sublime-ensime.git Ensime
