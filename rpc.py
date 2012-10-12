@@ -74,6 +74,33 @@ class Type(ActiveRecord):
       self.type_args = Type.parse_list(m[":type-args"]) if ":type-args" in m else []
       self.outer_type_id = m[":outer-type-id"] if ":outer-type-id" in m else None
       self.members = Member.parse_list(m[":members"]) if ":members" in m else []
+# 
+# (:name "org.apache.commons.io.FileUtils" 
+#   :local-name "FileUtils" 
+#   :decl-as 'class
+#   :pos (:file "/home/jeremy/dev/tools/play/play-2.0.3/repository/cache/commons-io/commons-io/jars/commons-io-1.4.jar"
+#     :offset -1)
+# ) 
+class SymbolSearchResults(ActiveRecord):
+  def populate(self, m):
+
+    self.results = map(SymbolSearchResult.parse, m)
+
+class SymbolSearchResult(ActiveRecord):
+  def __init__(self, m):
+    self.name = m[":name"]
+    self.local_name = m[":local-name"]
+    self.decl_as = m[":decl-as"] if ":decl-as" in m else None
+    self.pos = Position.parse(m[":pos"]) if ":pos" in m else None
+
+  @classmethod
+  def parse(cls, m):
+    self = cls(m)
+    return self
+    
+class RefactorResult(ActiveRecord):
+  def populate(self, m):
+    self.done = True
 
 class Member(ActiveRecord):
   def populate(self, m):
@@ -261,6 +288,12 @@ class Rpc(object):
 
   @async_rpc(Symbol.parse)
   def symbol_at_point(self, file_name, position): pass
+
+  @async_rpc(SymbolSearchResults.parse)
+  def import_suggestions(self, file_name, position, type_names, max_results): pass
+
+  @async_rpc(RefactorResult.parse)
+  def prepare_refactor(self, procedure_id, refactor_type, parameters, require_confirmation): pass
 
   @async_rpc()
   def debug_set_break(self, file_name, line): pass

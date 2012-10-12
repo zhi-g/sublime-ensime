@@ -1346,6 +1346,57 @@ class EnsimeGoToDefinition(RunningProjectFileOnly, EnsimeTextCommand):
     v.sel().add(region.begin())
     v.show(region)
 
+class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
+  def run(self, edit, target= None):
+    pos = int(target or self.v.sel()[0].begin())
+    word  = self.v.substr( self.v.word(pos))
+    if (len(strip(word)) > 0):
+      if self.v.is_dirty():
+        # edits = diff.diff_view_with_disk(self.v)
+        # print 'Edits: ' +str( edits)
+        # self.rpc.patch_source(self.v.file_name(), edits)
+        self.v.run_command('save')
+      self.rpc.import_suggestions(self.v.file_name(), pos, [word] , 10, self.handle_sugestions_response)
+
+  def handle_sugestions_response(self, info):
+    def get_name(result): return result.name
+    print "Got response " + str(info.results)
+    names = map(get_name, info.results) 
+    def do_refactor(i):
+      if (i > -1):
+        print(str(i) + ": " + names[i])
+        # params = {}
+        # params['qualifiedName'] = names[i]
+        # params['file'] = self.v.file_name()
+        # params['start'] = 0
+        # params['end'] = 0
+        params = [sym('qualifiedName'), names[i], sym('file'), self.v.file_name(), sym('start'), 0,sym('end'), 0]
+        print "params type: " +  str(type(params)) 
+        self.rpc.prepare_refactor(1, sym('addImport'), params, False, self.handle_refactor_response)
+   
+    self.v.window().show_quick_panel(names, do_refactor)
+
+  def handle_refactor_response(self, response):
+    view = self.v
+    original_size = view.size()
+    original_pos = view.sel()[0].begin()
+    # Load changes
+    view.run_command('revert')
+    # Wait until view loaded then move cursor to original position
+    def on_load():
+      if (view.is_loading()):
+        # Wait again
+        set_timeout(on_load, 50)
+      else:
+        size_diff = view.size() - original_size
+        new_pos = original_pos + size_diff
+        view.sel().clear()
+        view.sel().add(sublime.Region(new_pos))
+        view.show(new_pos)
+    on_load()
+
+
+
 ############################## SUBLIME COMMANDS: DEBUGGING ##############################
 
 class EnsimeToggleBreakpoint(ProjectFileOnly, EnsimeTextCommand):
