@@ -74,16 +74,9 @@ class Type(ActiveRecord):
       self.type_args = Type.parse_list(m[":type-args"]) if ":type-args" in m else []
       self.outer_type_id = m[":outer-type-id"] if ":outer-type-id" in m else None
       self.members = Member.parse_list(m[":members"]) if ":members" in m else []
-# 
-# (:name "org.apache.commons.io.FileUtils" 
-#   :local-name "FileUtils" 
-#   :decl-as 'class
-#   :pos (:file "/home/jeremy/dev/tools/play/play-2.0.3/repository/cache/commons-io/commons-io/jars/commons-io-1.4.jar"
-#     :offset -1)
-# ) 
+
 class SymbolSearchResults(ActiveRecord):
   def populate(self, m):
-
     self.results = map(SymbolSearchResult.parse, m)
 
 class SymbolSearchResult(ActiveRecord):
@@ -97,7 +90,7 @@ class SymbolSearchResult(ActiveRecord):
   def parse(cls, m):
     self = cls(m)
     return self
-    
+
 class RefactorResult(ActiveRecord):
   def populate(self, m):
     self.done = True
