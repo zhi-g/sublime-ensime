@@ -1356,11 +1356,10 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
         # print 'Edits: ' +str( edits)
         # self.rpc.patch_source(self.v.file_name(), edits)
         self.v.run_command('save')
-      self.rpc.import_suggestions(self.v.file_name(), pos, [word] , 10, self.handle_sugestions_response)
+      self.rpc.import_suggestions(self.v.file_name(), pos, [word] , self.env.settings.get("max_import_suggestions", 10) , self.handle_sugestions_response)
 
   def handle_sugestions_response(self, info):
     def get_name(result): return result.name
-    print "Got response " + str(info.results)
     names = map(get_name, info.results) 
     def do_refactor(i):
       if (i > -1):
