@@ -1330,7 +1330,7 @@ class EnsimeGoToDefinition(RunningProjectFileOnly, EnsimeTextCommand):
 
           # <workaround 2> v.show
           # has proven to be very unreliable
-          # but let's try and use it
+          # but let's try  and use it
           offset_in_editor = self.v.text_point(zb_row, zb_col)
           region_in_editor = Region(offset_in_editor, offset_in_editor)
           sublime.set_timeout(bind(self._scroll_viewport, self.v, region_in_editor), 100)
@@ -1349,12 +1349,9 @@ class EnsimeGoToDefinition(RunningProjectFileOnly, EnsimeTextCommand):
 class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
   def run(self, edit, target= None):
     pos = int(target or self.v.sel()[0].begin())
-    word  = self.v.substr( self.v.word(pos))
+    word  = self.v.substr(self.v.word(pos))
     if (len(strip(word)) > 0):
       if self.v.is_dirty():
-        # edits = diff.diff_view_with_disk(self.v)
-        # print 'Edits: ' +str( edits)
-        # self.rpc.patch_source(self.v.file_name(), edits)
         self.v.run_command('save')
       self.rpc.import_suggestions(self.v.file_name(), pos, [word] , self.env.settings.get("max_import_suggestions", 10) , self.handle_sugestions_response)
 
@@ -1363,14 +1360,7 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
     names = map(get_name, info.results) 
     def do_refactor(i):
       if (i > -1):
-        print(str(i) + ": " + names[i])
-        # params = {}
-        # params['qualifiedName'] = names[i]
-        # params['file'] = self.v.file_name()
-        # params['start'] = 0
-        # params['end'] = 0
         params = [sym('qualifiedName'), names[i], sym('file'), self.v.file_name(), sym('start'), 0,sym('end'), 0]
-        print "params type: " +  str(type(params)) 
         self.rpc.prepare_refactor(1, sym('addImport'), params, False, self.handle_refactor_response)
    
     self.v.window().show_quick_panel(names, do_refactor)
