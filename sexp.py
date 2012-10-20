@@ -23,7 +23,7 @@ def sexp_to_key_map(sexp):
       for i in xrange(0, len(sexp), 2):
           k,val = sexp[i],sexp[i+1]
           if type(k) == key_type:
-              result[str(k) ] = val
+              result[str(k)] = val
       return result
     except:
       raise Exception("not a sexp: %s" % sexp)
