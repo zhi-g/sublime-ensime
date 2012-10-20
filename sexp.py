@@ -17,22 +17,16 @@ class Symbol:
     return type(k) == type(self) and self.val == k.val
 
 def sexp_to_key_map(sexp):
-    try:
-      key_type = type(key(":key"))
-      result = {}
-      if len(sexp) == 0:
-        return result
-      if isinstance(sexp[0], list):
-        return map(sexp_to_key_map, sexp[0])   
-      else:  
-        for i in xrange(0, len(sexp), 2):
-            # print "sexp_to_key_map: " + str(i) + " " + str(type(sexp[i])) + " " + str( sexp[i]) + " " + str(len(sexp))
-            k,val = sexp[i],sexp[i+1]
-            if type(k) == key_type:
-              result[str(k) ] = val
-        return result
-    except:
-      raise Exception("not a sexp: %s" % sexp)
+  try:
+    key_type = type(key(":key"))
+    result = {}
+    for i in xrange(0, len(sexp), 2):
+        k,val = sexp[i],sexp[i+1]
+        if type(k) == key_type:
+          result[str(k) ] = val
+    return result
+  except:
+    raise Exception("not a sexp: %s" % sexp)
 
 def key(s):
   return Keyword(s)

@@ -1356,8 +1356,9 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
       self.rpc.import_suggestions(self.v.file_name(), pos, [word] , self.env.settings.get("max_import_suggestions", 10) , self.handle_sugestions_response)
 
   def handle_sugestions_response(self, info):
-    def get_name(result): return result.name
-    names = map(get_name, info.results) 
+    # We only send one word in the request so there should only be one SymbolSearchResults in the response list
+    results = info[0].results
+    names = map(lambda a: a.name, results)
     def do_refactor(i):
       if (i > -1):
         params = [sym('qualifiedName'), names[i], sym('file'), self.v.file_name(), sym('start'), 0,sym('end'), 0]
