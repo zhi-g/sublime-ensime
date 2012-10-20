@@ -1330,7 +1330,7 @@ class EnsimeGoToDefinition(RunningProjectFileOnly, EnsimeTextCommand):
 
           # <workaround 2> v.show
           # has proven to be very unreliable
-          # but let's try  and use it
+          # but let's try and use it
           offset_in_editor = self.v.text_point(zb_row, zb_col)
           region_in_editor = Region(offset_in_editor, offset_in_editor)
           sublime.set_timeout(bind(self._scroll_viewport, self.v, region_in_editor), 100)
