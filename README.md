@@ -16,7 +16,7 @@ This is a beta version. Basic things will work (for example, error highlighting)
 but there might still be problems. Please, submit issues to our tracker
 if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-ensime/issues/new.
 
-Also note that SublimeScala uses a pre-release Scala compiler (which roughly corresponds to 2.10.0-M6).
+Also note that SublimeScala uses a pre-release Scala compiler (which roughly corresponds to 2.10.0-RC2).
 This might also produce funny bugs. Use our bug reporting facility to report those:
 https://issues.scala-lang.org/secure/CreateIssue!default.jspa.
 
@@ -53,7 +53,7 @@ so we'll do our best to do a polished release around the time of the final relea
 * Hosts ENSIME in a completely transparent fashion. Solves the problem of runaway processes
   on Windows (Linux and Mac is on to-do list, we also wouldn't mind pull requests)
 
-* Tested on sources of scalac on Windows and Ubuntu (using ENSIME v0.9.8 with embedded Scala 2.10.0-M6)
+* Tested on sources of scalac on Windows and Ubuntu (using ENSIME v0.9.8.2 with embedded Scala 2.10.0-RC2)
 
 ## How to install?
 
