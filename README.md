@@ -87,8 +87,9 @@ so we'll do our best to do a polished release around the time of the final relea
 
 4. Configure Ensime.
 
-    a. Use `Preferences > Package Settings > Ensime` to configure
-       different aspects of this plugin.
+    a. Use `Preferences > Package Settings > Ensime` (Windows/Linux) or 
+       `Sublime Text 2 > Preferences > Package Settings > Ensime` (Mac OS) 
+       to configure different aspects of this plugin.
 
     b. By default Ensime customizes mouse bindings. It makes
        Ctrl+Click invoke `Go to Definition` and Alt+Click stand for `Inspect Type at Point`.
