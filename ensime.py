@@ -721,7 +721,7 @@ class Server(ServerListener, EnsimeCommon):
       message = "Ensime server executable \"" + self.env.ensime_executable + "\" does not exist."
       message += "\n\n"
       message += "If you haven't yet installed Ensime server, download it from http://download.sublimescala.org, "
-      message += "and unpack it into the \"server\" subfolder of the SublimeEnsime plugin home, which is usually located at " + sublime.packages_path() + os.sep + "sublime-ensime. "
+      message += "and unpack it into the \"server\" subfolder of the SublimeEnsime plugin home, which is usually located at " + sublime.packages_path() + os.sep + "Ensime. "
       message += "Your installation is correct if inside the \"server\" subfolder there are folders named \"bin\" and \"lib\"."
       message += "\n\n"
       message += "If you have already installed Ensime server, check your Ensime.sublime-settings (accessible via Preferences > Package Settings > Ensime) "
