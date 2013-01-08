@@ -19,7 +19,7 @@ if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-e
 ## Features
 
 * Creates and understands `.ensime` projects (maximum one project per Sublime window,
-  if you have a project with multiple subprojects only a single subproject will be available at a time)
+  if you have a project with multiple subprojects only a single subproject will be available at a time).
 
 * Once your Ensime project is configured (we have a helper for that) and Ensime is run,
   Scala files in that Ensime project benefit from a number of semantic services:
@@ -41,10 +41,10 @@ if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-e
 * Implements prototype support for debugging. At the moment you can set breakpoints, create launch
   configurations and step through programs in the debugger. This is a very early prototype,
   so it's unlikely that you'll be able to do anything useful with it, however it does illustrate
-  future development directions for this plugin
+  future development directions for this plugin.
 
 * Hosts ENSIME in a completely transparent fashion. Solves the problem of runaway processes
-  on Windows (Linux and Mac is on to-do list, we also wouldn't mind pull requests)
+  on Windows, Linux and Mac.
 
 ## How to install?
 
