@@ -40,6 +40,11 @@ def same_paths(path1, path2):
   path2_normalized = os.path.normcase(os.path.realpath(path2))
   return path1_normalized == path2_normalized
 
+def normalize_path(path):
+  if not path:
+    return None
+  return os.path.normcase(os.path.realpath(path))
+
 def is_subpath(root, wannabe):
   if not root or not wannabe:
     return False

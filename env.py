@@ -87,8 +87,41 @@ class EnsimeEnvironment(object):
     self.controller = None # injected by EnsimeStartup to ensure smooth reloading
     self.compiler_ready = False
 
+    # TODO: find a better place for this beast
+    class NoteStorage(object):
+      def __init__(self):
+        self.data = []
+        self.normalized_cache = {}
+        self.per_file_cache = {}
+      def append(self, data):
+        self.data += data
+        for datum in data:
+          if not datum.file_name in self.normalized_cache:
+            self.normalized_cache[datum.file_name] = normalize_path(datum.file_name)
+          file_name = self.normalized_cache[datum.file_name]
+          if not file_name in self.per_file_cache:
+            self.per_file_cache[file_name] = []
+          self.per_file_cache[file_name].append(datum)
+      def filter(self, pred):
+        dropouts = set(map(lambda n: self.normalized_cache[n.file_name], filter(lambda n: not pred(n), self.data)))
+        # doesn't take into account pathological cases when a "*.scala" file
+        # is actually a symlink to something without a ".scala" extension
+        for file_name in self.per_file_cache.keys():
+          if file_name in dropouts:
+            del self.per_file_cache[file_name]
+        self.data = filter(pred, self.data)
+      def clear(self):
+        self.filter(lambda f: False)
+      def for_file(self, file_name):
+        if not file_name in self.normalized_cache:
+          self.normalized_cache[file_name] = normalize_path(file_name)
+        file_name = self.normalized_cache[file_name]
+        if not file_name in self.per_file_cache:
+          self.per_file_cache[file_name] = []
+        return self.per_file_cache[file_name]
+
     # core stuff (mutable)
-    self._notes = []
+    self._notes = NoteStorage()
     self.notee = None
     # Tracks the most recent completion prefix that has been shown to yield empty
     # completion results. Use this so we don't repeatedly hit ensime for results
