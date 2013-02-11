@@ -255,7 +255,7 @@ def select_subproject(conf, window, on_complete):
   prompt the user. Otherwise, return the sole subproject name."""
   m = sexp.sexp_to_key_map(conf)
   subprojects = [sexp.sexp_to_key_map(p) for p in m.get(":subprojects", [])]
-  names = [p[":name"] for p in subprojects]
+  names = [p[":module-name"] for p in subprojects]
   if len(names) > 1:
     window.show_quick_panel(names, lambda i: on_complete(names[i]) if i != -1 else on_complete(None))
   elif len(names) == 1:
