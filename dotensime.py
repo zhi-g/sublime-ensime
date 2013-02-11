@@ -257,7 +257,7 @@ def select_subproject(conf, window, on_complete):
   subprojects = [sexp.sexp_to_key_map(p) for p in m.get(":subprojects", [])]
   names = [p[":name"] for p in subprojects]
   if len(names) > 1:
-    window.show_quick_panel(names, lambda i: on_complete(names[i]))
+    window.show_quick_panel(names, lambda i: on_complete(names[i]) if i != -1 else on_complete(None))
   elif len(names) == 1:
     sublime.set_timeout(functools.partial(on_complete, names[0]), 0)
   else:
