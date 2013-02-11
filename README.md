@@ -30,10 +30,10 @@ if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-e
       displayed with `Tools > Ensime > Commands > Show notes`.
 
     * Type-aware completions for identifiers (integrates into the built-in mechanism of completions
-      in Sublime Text 2, depending on your configuration it might be bound to `Ctrl+Space` or `Tab`).
+      in Sublime Text 2, depending on your configuration it might be bound to `Ctrl+Space`/`Cmd+Space` or `Tab`).
 
     * Type-aware go to definition (implemented by `ensime_go_to_definition` command: bind it yourself
-      to your favorite hotkey or use the default `Ctrl+Click` binding).
+      to your favorite hotkey or use the default `Ctrl+Click` binding on Windows/Linux or `Cmd+Click` on Mac).
 
 * Does not compile the project for you. Use one of the established build tools (Ant,
   Maven, SBT, etc) to do that.
@@ -78,18 +78,18 @@ if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-e
 
 4. Configure Ensime.
 
-    a. Use `Preferences > Package Settings > Ensime` (Windows/Linux) or 
-       `Sublime Text 2 > Preferences > Package Settings > Ensime` (Mac OS) 
+    a. Use `Preferences > Package Settings > Ensime` (Windows/Linux) or
+       `Sublime Text 2 > Preferences > Package Settings > Ensime` (Mac)
        to configure different aspects of this plugin.
 
     b. By default Ensime customizes mouse bindings. It makes
-       Ctrl+Click invoke `Go to Definition` and Alt+Click stand for `Inspect Type at Point`.
+       `Ctrl+Click`/`Cmd+Click` invoke `Go to Definition` and `Alt+Click` stand for `Inspect Type at Point`.
        If you want to disable these bindings or change them bindings to something else,
        adjust the config at `Preferences > Package Settings > Mousemap - Default`.
 
 ## How to use?
 
-Open the Sublime command palette (typically bound to `Ctrl+Shift+P`) and type `Ensime: Startup`.
+Open the Sublime command palette (typically bound to `Ctrl+Shift+P` on Windows/Linux and `Cmd+Shift+P` on Mac) and type `Ensime: Startup`.
 
 If you don't have an Ensime project, the plugin will guide you through creating it.
 
