@@ -243,6 +243,10 @@ class ProjectExists:
   def is_enabled(self):
     return dotensime.exists(self.w)
 
+class NotRunningOnly:
+  def is_enabled(self):
+    return not self.is_running()
+
 class RunningOnly:
   def is_enabled(self):
     return self.is_running()
@@ -1164,9 +1168,13 @@ class EnsimeRestart(RunningOnly, EnsimeWindowCommand):
     self.w.run_command("ensime_shutdown")
     sublime.set_timeout(bind(self.w.run_command, "ensime_startup"), 100)
 
-class EnsimeCreateProject(ProjectDoesntExist, EnsimeWindowCommand):
+class EnsimeCreateProjectFromScratch(NotRunningOnly, EnsimeWindowCommand):
   def run(self):
-    dotensime.create(self.w)
+    dotensime.create(self.w, from_scratch = True)
+
+class EnsimeCreateProjectFromSbt(NotRunningOnly, EnsimeWindowCommand):
+  def run(self):
+    dotensime.create(self.w, from_sbt = True)
 
 class EnsimeShowProject(ProjectExists, EnsimeWindowCommand):
   def run(self):
@@ -1363,7 +1371,7 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
       if (i > -1):
         params = [sym('qualifiedName'), names[i], sym('file'), self.v.file_name(), sym('start'), 0,sym('end'), 0]
         self.rpc.prepare_refactor(1, sym('addImport'), params, False, self.handle_refactor_response)
-   
+
     self.v.window().show_quick_panel(names, do_refactor)
 
   def handle_refactor_response(self, response):
