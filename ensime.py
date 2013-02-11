@@ -107,9 +107,8 @@ class EnsimeCommon(object):
       getattr(colorer, method)(*args)
 
   def _invoke_all_colorers(self, method, *args):
-    # todo. only invoke colorer on visible views
-    # because invisible views will be recolorized on activation
-    for v in self.w.views():
+    for i in range(0, self.w.num_groups()):
+      v = self.w.active_view_in_group(i)
       colorer = Colorer(v)
       getattr(colorer, method)(*args)
 
@@ -586,22 +585,22 @@ class Client(ClientListener, EnsimeCommon):
 
   @call_back_into_ui_thread
   def message_java_notes(self, msg_id, payload):
-    self.env._notes += rpc.Note.parse_list(payload)
+    self.env._notes.append(rpc.Note.parse_list(payload))
     self._update_note_ui()
 
   @call_back_into_ui_thread
   def message_scala_notes(self, msg_id, payload):
-    self.env._notes += rpc.Note.parse_list(payload)
+    self.env._notes.append(rpc.Note.parse_list(payload))
     self._update_note_ui()
 
   @call_back_into_ui_thread
   def message_clear_all_java_notes(self, msg_id, _):
-    self.env._notes = filter(lambda n: not n.file_name.endswith(".java"), self.env._notes)
+    self.env._notes.filter(lambda n: not n.file_name.endswith(".java"))
     self._update_note_ui()
 
   @call_back_into_ui_thread
   def message_clear_all_scala_notes(self, msg_id, _):
-    self.env._notes = filter(lambda n: not n.file_name.endswith(".scala"), self.env._notes)
+    self.env._notes.filter(lambda n: not n.file_name.endswith(".scala"))
     self._update_note_ui()
 
   @call_back_into_ui_thread
@@ -849,7 +848,7 @@ class Controller(EnsimeCommon, ClientListener, ServerListener):
           self.log("Error shutting down ensime debugger:")
           self.log(traceback.format_exc())
         try:
-          self.env._notes = []
+          self.env._notes.clear()
           sublime.set_timeout(self.uncolorize_all, 0)
           sublime.set_timeout(self.env.notes.clear, 0)
         except:
@@ -941,8 +940,7 @@ class Colorer(EnsimeCommon):
     self.v.erase_regions(ENSIME_ERROR_UNDERLINE_REGION)
 
     if self.env:
-      relevant_notes = filter(
-        lambda note: same_paths(note.file_name, self.v.file_name()), self.env._notes)
+      relevant_notes = self.env._notes.for_file(self.v.file_name())
 
       # Underline specific error range
       underlines = [sublime.Region(note.start, note.end) for note in relevant_notes]
@@ -975,9 +973,7 @@ class Colorer(EnsimeCommon):
       self._update_statusbar(custom_status)
     elif self.env and self.env.settings.get("ensime_statusbar_showerrors"):
       if self.v.sel():
-        relevant_notes = filter(
-          lambda note: same_paths(note.file_name, self.v.file_name()),
-          self.env._notes)
+        relevant_notes = self.env._notes.for_file(self.v.file_name())
         bol = self.v.line(self.v.sel()[0].begin()).begin()
         eol = self.v.line(self.v.sel()[0].begin()).end()
         msgs = [note.message for note in relevant_notes
@@ -1241,9 +1237,7 @@ class Notes(EnsimeToolView):
     lines = []
     # print "notee: " + str(self.env.notee.file_name() or self.env.notee.name())
     if self.env.notee:
-      relevant_notes = filter(
-        lambda note: same_paths(note.file_name, self.env.notee.file_name()),
-        self.env._notes)
+      relevant_notes = self.env._notes.for_file(self.env.notee.file_name())
       for note in relevant_notes:
         loc = self.project_relative_path(note.file_name) + ":" + str(note.line)
         severity = note.severity
