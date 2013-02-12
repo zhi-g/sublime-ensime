@@ -46,8 +46,9 @@ class Session(object):
 
   @property
   def launch_name(self):
-    if self.launch_key: return "launch configuration \"" + self.launch_key + "\""
-    else: return "launch configuration"
+    if self.launch_key: name = "launch configuration \"" + self.launch_key + "\""
+    else: name =  "launch configuration"
+    return name + " for your Ensime project"
 
   @property
   def launch(self):
@@ -108,7 +109,7 @@ def load_launch(env):
 
   session = env.load_session()
   if not session:
-    message = "Launch configuration could not be loaded. "
+    message = "Launch configuration for the Ensime project could not be loaded. "
     message += "Maybe the config is not accessible, but most likely it's simply not a valid JSON. "
     message += "\n\n"
     message += "Sublime will now open the configuration file for you to fix. "
@@ -122,11 +123,11 @@ def load_launch(env):
   if not launch:
     message = "Your current " + session.launch_name + " is not present. "
     message += "\n\n"
-    message += "This means that the \"current_launch_config\" field of the config "
+    message += "This happens because the \"current_launch_config\" field of the config "
     if session.launch_key: config_status = "set to \"" + session.launch_key + "\""
     else: config_status = "set to an empty string"
     message += "(which is currently " + config_status + ") "
-    message += "doesn't correspond to any entries in the \"launch_configs\" field of the config."
+    message += "doesn't correspond to any entries in the \"launch_configs\" field of the launch configuration."
     message += "\n\n"
     message += "Sublime will now open the configuration file for you to fix. Do you wish to proceed?"
     if sublime.ok_cancel_dialog(message):
@@ -136,7 +137,9 @@ def load_launch(env):
   if not launch.is_valid():
     message = "Your current " + session.launch_name + " doesn't specify the main class to start. "
     message += "\n\n"
-    message += "This means that the entry with \"name\":  \"" + session.launch_key + "\" in the \"launch_configs\" field of the config "
+    if session.launch_key: launch_description = "the entry named \"" + session.launch_key + "\""
+    else: launch_description = "the default unnamed entry"
+    message += "This happens because " + launch_description + " in the \"launch_configs\" field of the launch configuration "
     message += "does not have the \"main_class\" attribute set."
     message += "\n\n"
     message += "Sublime will now open the configuration file for you to fix. Do you wish to proceed?"
