@@ -142,7 +142,7 @@ def create(window, from_scratch = False, from_sbt = False):
           if content.endswith("\n\n"): pass
           elif content.endswith("\n"): content += "\n"
           else: content += "\n\n"
-        content += "addSbtPlugin(\"org.ensime\" % \"ensime-sbt-cmd\" % \"0.1.0\")"
+        content += "addSbtPlugin(\"org.ensime\" % \"ensime-sbt-cmd\" % \"0.1.1\")"
       with open(plugins_sbt, "w") as f:
         f.write(content)
 
