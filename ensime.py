@@ -12,6 +12,7 @@ import sexp
 from sexp import key, sym
 from constants import *
 from paths import *
+from rpc import *
 
 class EnsimeCommon(object):
   def __init__(self, owner):
@@ -123,6 +124,8 @@ class EnsimeCommon(object):
   def redraw_all_breakpoints(self): self._invoke_all_colorers("redraw_breakpoints")
   def redraw_debug_focus(self, view = "default"): self._invoke_view_colorer("redraw_debug_focus", view)
   def redraw_all_debug_focuses(self): self._invoke_all_colorers("redraw_debug_focus")
+  def redraw_stack_focus(self, view = "default"): self._invoke_view_colorer("redraw_stack_focus", view)
+  def redraw_all_stack_focuses(self): self._invoke_all_colorers("redraw_stack_focus")
 
 class EnsimeWindowCommand(EnsimeCommon, WindowCommand):
   def __init__(self, window):
@@ -186,9 +189,13 @@ class EnsimeEventListenerProxy(EventListener):
   def on_query_completions(self, view, prefix, locations):
     return self._invoke(view, "on_query_completions", prefix, locations)
 
-class EnsimeMouseCommand(EnsimeTextCommand):
+class EnsimeSloppyMouseCommand(EnsimeTextCommand):
+  def run(self, edit):
+    raise Exception("abstract method: EnsimeSloppyMouseCommand.run")
+
+class EnsimePreciseMouseCommand(EnsimeTextCommand):
   def run(self, target):
-    raise Exception("abstract method: EnsimeMouseCommand.run")
+    raise Exception("abstract method: EnsimePreciseMouseCommand.run")
 
   def is_applicable(self):
     return self.is_running() and self.in_project()
@@ -284,6 +291,18 @@ class EnsimeToolView(EnsimeCommon):
   def render(self):
     raise Exception("abstract method: EnsimeToolView.render(self)")
 
+  def setup_events(self, v):
+    v.settings().set("result_file_regex", "([:.a-z_A-Z0-9\\\\/-]+[.](?:scala|java)):([0-9]+)")
+    v.settings().set("result_line_regex", "")
+    v.settings().set("result_base_dir", self.env.project_root)
+    other_view = self.w.new_file()
+    self.w.focus_view(other_view)
+    self.w.run_command("close_file")
+    self.w.focus_view(v)
+
+  def handle_event(self, event, target):
+    pass
+
   @property
   def v(self):
     wannabes = filter(lambda v: v.name() == self.name, self.w.views())
@@ -293,13 +312,7 @@ class EnsimeToolView(EnsimeCommon):
     v = self.w.new_file()
     v.set_scratch(True)
     v.set_name(self.name)
-    v.settings().set("result_file_regex", "([:.a-z_A-Z0-9\\\\/-]+[.](?:scala|java)):([0-9]+)")
-    v.settings().set("result_line_regex", "")
-    v.settings().set("result_base_dir", self.env.project_root)
-    other_view = self.w.new_file()
-    self.w.focus_view(other_view)
-    self.w.run_command("close_file")
-    self.w.focus_view(v)
+    self.setup_events(v)
     return v
 
   def _update_v(self, content):
@@ -315,9 +328,6 @@ class EnsimeToolView(EnsimeCommon):
     self._update_v("")
 
   # TODO: ideally, rendering should only happen when a tool view is visible
-  # TODO: also, rendering should be asynchronous
-  # if you implement this, make sure to change correspond method signatures in rpc.py
-  # to say "@async_rpc" instead of "@sync_rpc"
   def refresh(self):
     if self.v != None:
       content = self.render() or ""
@@ -516,6 +526,18 @@ class Client(ClientListener, EnsimeCommon):
   def message_return(self, msg_id, payload):
     handler, call_back_into_ui_thread, req_time = self.handlers.get(msg_id)
     if handler: del self.handlers[msg_id]
+    def invoke_subscribed_handler(success, payload = None):
+      if callable(handler):
+        # only do async callbacks if the result is a success
+        # however note that we need to ping sync callbacks in any case
+        # in order to prevent freezes upon erroneous responses
+        if call_back_into_ui_thread and success:
+          sublime.set_timeout(bind(handler, payload), 0)
+        else:
+          handler(payload)
+      else:
+        handler.payload = payload
+        handler.set()
 
     resp_time = time.time()
     self.log_client("request #" + str(msg_id) + " took " + str(resp_time - req_time) + " seconds")
@@ -525,14 +547,7 @@ class Client(ClientListener, EnsimeCommon):
     if reply_type == ":ok":
       payload = payload[1]
       if handler:
-        if callable(handler):
-          if call_back_into_ui_thread:
-            sublime.set_timeout(bind(handler, payload), 0)
-          else:
-            handler(payload)
-        else:
-          handler.payload = payload
-          handler.set()
+        invoke_subscribed_handler(success = True, payload = payload)
       else:
         self.log_client("warning: no handler registered for message #" + str(msg_id) + " with payload " + str(payload))
     # (:return (:abort 210 "Error occurred in Analyzer. Check the server log.") 3)
@@ -543,12 +558,15 @@ class Client(ClientListener, EnsimeCommon):
         self.status_message("Ensime startup has failed")
         self.env.controller.shutdown()
       else:
+        invoke_subscribed_handler(success = False)
         self.status_message(detail)
     # (:return (:error NNN "SSS") 4)
     elif reply_type == ":error":
       detail = payload[2]
+      invoke_subscribed_handler(success = False)
       self.error_message(self.prettify_error_detail(detail))
     else:
+      invoke_subscribed_handler(success = False)
       self.log_client("unexpected reply type: " + reply_type)
 
   def call_back_into_ui_thread(vanilla):
@@ -930,6 +948,7 @@ class Colorer(EnsimeCommon):
     self.redraw_status()
     self.redraw_breakpoints()
     self.redraw_debug_focus()
+    self.redraw_stack_focus()
 
   def uncolorize(self):
     self.v.erase_regions(ENSIME_ERROR_OUTLINE_REGION)
@@ -937,6 +956,7 @@ class Colorer(EnsimeCommon):
     # don't erase breakpoints, they should be permanent regardless of whether ensime is running or not
     # self.v.erase_regions(ENSIME_BREAKPOINT_REGION)
     self.v.erase_regions(ENSIME_DEBUGFOCUS_REGION)
+    self.v.erase_regions(ENSIME_STACKFOCUS_REGION)
     self.redraw_status()
 
   def redraw_highlights(self):
@@ -971,6 +991,7 @@ class Colorer(EnsimeCommon):
       # breakpoints and debug focus should always have priority over red squiggles
       self.redraw_breakpoints()
       self.redraw_debug_focus()
+      self.redraw_stack_focus()
 
   def redraw_status(self, custom_status = None):
     if custom_status:
@@ -1053,16 +1074,16 @@ class Colorer(EnsimeCommon):
       sublime.set_timeout(self.redraw_debug_focus, 100)
     else:
       if self.env and self.env.focus and same_paths(self.env.focus.file_name, self.v.file_name()):
-          focused_region = self.v.full_line(self.v.text_point(self.env.focus.line - 1, 0))
-          self.v.add_regions(
-            ENSIME_DEBUGFOCUS_REGION,
-            [focused_region],
-            self.env.settings.get("debugfocus_scope"),
-            self.env.settings.get("debugfocus_icon"))
-          w = self.v.window() or sublime.active_window()
-          w.focus_view(self.v)
-          self.redraw_breakpoints()
-          sublime.set_timeout(bind(self._scroll_viewport, self.v, focused_region), 0)
+        focused_region = self.v.full_line(self.v.text_point(self.env.focus.line - 1, 0))
+        self.v.add_regions(
+          ENSIME_DEBUGFOCUS_REGION,
+          [focused_region],
+          self.env.settings.get("debugfocus_scope"),
+          self.env.settings.get("debugfocus_icon"))
+        w = self.v.window() or sublime.active_window()
+        w.focus_view(self.v)
+        self.redraw_breakpoints()
+        sublime.set_timeout(bind(self._scroll_viewport, self.v, focused_region), 0)
 
   def _scroll_viewport(self, v, region):
     # thanks to Fredrik Ehnbom
@@ -1077,6 +1098,16 @@ class Colorer(EnsimeCommon):
     v.sel().clear()
     v.sel().add(region.begin())
     v.show(region)
+
+  def redraw_stack_focus(self):
+    self.v.erase_regions(ENSIME_STACKFOCUS_REGION)
+    if self.env and self.env.stackframe and self.v.name() == ENSIME_STACK_VIEW:
+      focused_region = self.v.full_line(self.v.text_point(self.env.stackframe.index, 0))
+      self.v.add_regions(
+        ENSIME_STACKFOCUS_REGION,
+        [focused_region],
+        self.env.settings.get("stackfocus_scope"),
+        self.env.settings.get("stackfocus_icon"))
 
 class Completer(EnsimeEventListener):
 
@@ -1252,7 +1283,7 @@ class Notes(EnsimeToolView):
         lines += [" " * (note.col - 1) + "^"]
     return "\n".join(lines)
 
-class EnsimeAltClick(EnsimeMouseCommand):
+class EnsimeAltClick(EnsimePreciseMouseCommand):
   def is_applicable(self):
     return self.env.settings.get("alt_click_inspects_type_at_point") and super(EnsimeAltClick, self).is_applicable()
 
@@ -1277,7 +1308,7 @@ class EnsimeInspectTypeAtPoint(RunningProjectFileOnly, EnsimeTextCommand):
     else:
       self.status_message("Cannot find out type")
 
-class EnsimeCtrlClick(EnsimeMouseCommand):
+class EnsimeCtrlClick(EnsimePreciseMouseCommand):
   def is_applicable(self):
     return self.env.settings.get("ctrl_click_goes_to_definition") and super(EnsimeCtrlClick, self).is_applicable()
 
@@ -1482,13 +1513,26 @@ class EnsimeShowStack(EnsimeWindowCommand):
 
   def run(self):
     self.env.stack.show()
+    self.redraw_all_stack_focuses()
 
-class EnsimeShowLocals(EnsimeWindowCommand):
+class EnsimeShowWatches(EnsimeWindowCommand):
   def is_enabled(self):
-    return self.env.locals.can_show()
+    return self.env.watches.can_show()
 
   def run(self):
-    self.env.locals.show()
+    self.env.watches.show()
+
+class EnsimeDoubleClick(EnsimeSloppyMouseCommand):
+  def calculate_handler(self):
+    if self.v.name() == ENSIME_NOTES_VIEW: return self.env.notes
+    elif self.v.name() == ENSIME_OUTPUT_VIEW: return self.env.output
+    elif self.v.name() == ENSIME_STACK_VIEW: return self.env.stack
+    elif self.v.name() == ENSIME_WATCHES_VIEW: return self.env.watches
+    else: return None
+
+  def run(self, edit):
+    handler = self.calculate_handler()
+    if handler: handler.handle_event("double_click", self.v.sel()[0].a)
 
 class Debugger(EnsimeCommon):
   def __init__(self, env):
@@ -1497,10 +1541,13 @@ class Debugger(EnsimeCommon):
   def shutdown(self, erase_dashboard = False):
     self.env.profile = None
     self.env.focus = None
+    self.env.backtrace = None
+    self.env.stackframe = None
+    self.env.watchstate = None
     if erase_dashboard:
       self.env.output.clear()
       self.env.stack.clear()
-      self.env.locals.clear()
+      self.env.watches.clear()
 
   def handle(self, event):
     if event.type == "start":
@@ -1511,11 +1558,12 @@ class Debugger(EnsimeCommon):
       self.shutdown(erase_dashboard = False) # so that people can take a look later
       self.status_message("Debuggee has died" if event.type == "death" else "Debugger has disconnected")
       self.redraw_all_debug_focuses()
+      self.redraw_all_stack_focuses()
     elif event.type == "output":
       self.env.output.append(event.body)
     elif event.type == "exception" or event.type == "breakpoint" or event.type == "step":
       if event.type == "exception":
-        # todo. how to I get to the details of this exception?
+        # TODO: how to I get to the details of this exception?
         rendered = "an exception has been thrown\n"
         self.env.output.append(rendered)
       self.env.focus = Focus(event.thread_id, event.thread_name, event.file_name, event.line)
@@ -1525,8 +1573,7 @@ class Debugger(EnsimeCommon):
       else:
         focus_summary = "an unknown location"
       self.redraw_all_debug_focuses()
-      self.env.stack.refresh()
-      self.env.locals.refresh()
+      self.env.stack.update_backtrace()
       self.status_message("(" + str(event.type) + ") Debugger has stopped at " + str(focus_summary))
     self.redraw_status(self.w.active_view())
 
@@ -1605,27 +1652,206 @@ class Stack(EnsimeToolView):
   def name(self):
     return ENSIME_STACK_VIEW
 
+  def clear(self):
+    self.env.backtrace = None
+    self.env.watches.clear()
+    self._update_v("")
+
+  def update_backtrace(self):
+    # TODO: this should really be asynchronous
+    # if you implement this, make sure to change correspond method signatures in rpc.py
+    # to say "@async_rpc" instead of "@sync_rpc"
+    # TODO: acquire backtraces of all running threads
+    self.env.backtrace = self.rpc.debug_backtrace(self.env.focus.thread_id)
+    self.refresh()
+    self.env.watches.update_stackframe(0)
+
   def render(self):
-    # TODO: if we have multiple threads, show all of them
-    backtrace = self.rpc.debug_backtrace(self.env.focus.thread_id)
     rendered = []
-    for frame in backtrace.frames:
+    for frame in self.env.backtrace.frames:
       code_location = str(frame.class_name) + "." + str(frame.method_name)
       short_file_name = frame.pc_location.file_name
       if short_file_name.startswith(self.env.project_root):
         short_file_name = short_file_name[len(self.env.project_root):]
         if short_file_name.startswith("/") or short_file_name.startswith("\\"): short_file_name = short_file_name[1:]
+      short_file_name = os.path.basename(short_file_name) # navigation is no longer handled by result_file_regex, it now uses handle_event
       filesystem_location = str(short_file_name) + ":" + str(frame.pc_location.line)
       rendered.append(code_location + " (" + filesystem_location + ")")
     return "\n".join(rendered)
 
-class Locals(EnsimeToolView):
+  def setup_events(self, v):
+    # we don't care about arranging result_file_regex here, because we'll be using short file names
+    pass
+
+  def handle_event(self, event, target):
+    if event == "double_click":
+      row, _ = self.v.rowcol(target)
+      if self.env and self.env.backtrace:
+        frames = self.env.backtrace.frames
+        if row < len(frames):
+          self.env.watches.update_stackframe(row)
+          file_name = self.env.stackframe.pc_location.file_name
+          line = self.env.stackframe.pc_location.line
+          if os.path.exists(file_name) and line != -1:
+            sel = Region(self.v.sel()[0].a, self.v.sel()[0].a)
+            self.v.sel().clear()
+            self.v.sel().add(sel)
+            # TODO: sometimes fails to position the cursor at the target line if the target file is already visible
+            self.w.open_file("%s:%d:%d" % (file_name, line, 1), sublime.ENCODED_POSITION)
+
+class WatchNode(EnsimeCommon):
+  def __init__(self, env, parent, label):
+    super(WatchNode, self).__init__(env.w)
+    self.parent = parent
+    self.is_expanded = False
+    self._children_loaded = False
+    self._children = None
+    self.label = label
+    self._description_loaded = False
+    self._description = None
+
+  def expand(self):
+    self.is_expanded = True
+
+  def collapse(self):
+    self.is_expanded = False
+
+  def load_children(self):
+    raise Exception("abstract method: WatchNode.load_children")
+
+  @property
+  def children(self):
+    if not self._children_loaded:
+      self._children_loaded = True
+      self._children = list(self.load_children())
+    return self._children
+
+  def load_description(self):
+    raise Exception("abstract method: WatchNode.load_description")
+
+  @property
+  def description(self):
+    if not self._description_loaded:
+      self._description_loaded = True
+      self._description = self.load_description()
+    return self._description
+
+  @property
+  def level(self):
+    return self.parent.level + 1 if self.parent else 0
+
+  def visible_subtree(self):
+    yield self
+    if self.is_expanded:
+      for child in self.children:
+        for subsubnode in list(child.visible_subtree()):
+          yield subsubnode
+
+class WatchValueLeaf(WatchNode):
+  def __init__(self, env, parent, label, description):
+    super(WatchValueLeaf, self).__init__(env, parent, label)
+    self._description = description
+
+  def load_children(self):
+    return []
+
+  def load_description(self):
+    return self._description
+
+class WatchValueArrayNode(WatchNode):
+  def __init__(self, env, parent, label, value):
+    super(WatchValueArrayNode, self).__init__(env, parent, label)
+    self.value = value
+
+  def load_children(self):
+    for i in range(0, self.value.length):
+      yield create_watch_value_node(self.env, self, "[" + str(i) + "]", DebugLocationElement(self.value.object_id, i))
+
+  def load_description(self):
+    if self.value.object_id:
+      return self.env.rpc.debug_to_string(DebugLocationReference(self.value.object_id))
+    else: # empty array
+      return "[]"
+
+class WatchValueObjectNode(WatchNode):
+  def __init__(self, env, parent, label, value):
+    super(WatchValueObjectNode, self).__init__(env, parent, label)
+    self.value = value
+
+  def load_children(self):
+    for field in self.fields:
+      yield create_watch_value_node(self.env, self, field.name, DebugLocationElement(self.value.object_id, field.name))
+
+  def load_description(self):
+    return self.env.rpc.debug_to_string(DebugLocationReference(self.value.object_id))
+
+def create_watch_value_node(env, parent, label, value):
+  if str(value.type) == "null":
+    return WatchValueLeaf(env, parent, label, "null")
+  elif str(value.type) == "prim":
+    return WatchValueLeaf(env, parent, label, value.summary)
+  elif str(value.type) == "str":
+    return WatchValueLeaf(env, parent, label, value.summary)
+  elif str(value.type) == "obj":
+    return WatchValueObjectNode(env, parent, label, value)
+  elif str(value.type) == "arr":
+    return WatchValueArrayNode(env, parent, label, value)
+  else:
+    raise Exception("unexpected debug value of type " + str(value.type) + ": " + str(value))
+
+class WatchRoot(WatchNode):
+  def __init__(self, env):
+    super(WatchRoot, self).__init__(env, None, None)
+    self.expand()
+
+  def load_children(self):
+    if self.env.stackframe:
+      for i, local in enumerate(self.env.stackframe.locals):
+        label = local.name
+        # TODO: this, along with other stuff in WatchValueNode, should really be asynchronous
+        # if you implement this, make sure to change correspond method signatures in rpc.py
+        # to say "@async_rpc" instead of "@sync_rpc"
+        value = self.rpc.debug_value(DebugLocationSlot(self.env.backtrace.thread_id, self.env.stackframe.index, i))
+        yield create_watch_value_node(self.env, self, label, value)
+
+class Watches(EnsimeToolView):
   def can_show(self):
     return self.env and self.env.focus
 
   @property
   def name(self):
-    return ENSIME_LOCALS_VIEW
+    return ENSIME_WATCHES_VIEW
+
+  def clear(self):
+    self.env.stackframe = None
+    self.env.watchstate = None
+    self._update_v("")
+
+  def update_stackframe(self, index):
+    self.env.stackframe = self.env.backtrace.frames[index] if self.env.backtrace else None
+    self.env.watchstate = WatchRoot(self.env)
+    self.redraw_all_stack_focuses()
+    self.refresh()
 
   def render(self):
+    rendered = []
+    if self.env.watchstate:
+      ordered_nodes = list(self.env.watchstate.visible_subtree())[1:] # strip off the root itself
+      def render_node(node):
+        return "  " * (node.level - 1) + str(node.label) + " = " + str(node.description)
+      rendered.extend(map(render_node, ordered_nodes))
+    return "\n".join(rendered)
+
+  def setup_events(self, v):
+    # we don't care about arranging result_file_regex here, because we want to use double-click to expand watchees
     pass
+
+  def handle_event(self, event, target):
+    if event == "double_click":
+      row, _ = self.v.rowcol(target)
+      if self.env and self.env.stackframe:
+        locals = self.env.stackframe.locals
+        if row < len(locals):
+          local = locals[row]
+          # TODO: drill down into the local if possible, store the state in self.env.watchstate
+          pass

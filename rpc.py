@@ -25,6 +25,9 @@ class ActiveRecord(object):
     populate(m)
     return self
 
+  def unparse(self):
+    raise Exception("abstract method: ActiveRecord.unparse")
+
 class Note(ActiveRecord):
   def populate(self, m):
     self.message = m[":msg"]
@@ -76,9 +79,9 @@ class Type(ActiveRecord):
       self.members = Member.parse_list(m[":members"]) if ":members" in m else []
 
 class SymbolSearchResults(ActiveRecord):
-  #  we override parse here because raw contains a List of SymbolSearchResult.
-  # The ActiveRecord parse method expects raw to contain an object at this point
-  # and calls sexp_to_key_map. .
+  # we override parse here because raw contains a List of SymbolSearchResult
+  # typehe ActiveRecord parse method expects raw to contain an object at this point
+  # and calls sexp_to_key_map
   @classmethod
   def parse(cls, raw):
     if not raw: return None
@@ -95,7 +98,6 @@ class SymbolSearchResult(ActiveRecord):
     self.local_name = m[":local-name"]
     self.decl_as = m[":decl-as"] if ":decl-as" in m else None
     self.pos = Position.parse(m[":pos"]) if ":pos" in m else None
-
 
 class RefactorResult(ActiveRecord):
   def populate(self, m):
@@ -230,6 +232,38 @@ class DebugLocation(ActiveRecord):
     else:
       raise Exception("unexpected debug location of type " + str(self.type) + ": " + str(m))
 
+class DebugLocationReference(DebugLocation):
+  def __init__(self, object_id):
+    self.object_id = object_id
+
+  def unparse(self):
+    return [[key(":type"), sym("reference"), key(":object-id"), self.object_id]]
+
+class DebugLocationElement(DebugLocation):
+  def __init__(self, object_id, index):
+    self.object_id = object_id
+    self.index = index
+
+  def unparse(self):
+    return [[key(":type"), sym("element"), key(":object-id"), self.object_id, key(":index"), self.index]]
+
+class DebugLocationField(DebugLocation):
+  def __init__(self, object_id, field):
+    self.object_id = object_id
+    self.field = field
+
+  def unparse(self):
+    return [[key(":type"), sym("field"), key(":object-id"), self.object_id, key(":field"), self.field]]
+
+class DebugLocationSlot(DebugLocation):
+  def __init__(self, thread_id, frame, offset):
+    self.thread_id = thread_id
+    self.frame = frame
+    self.offset = offset
+
+  def unparse(self):
+    return [[key(":type"), sym("slot"), key(":thread-id"), self.thread_id, key(":frame"), self.frame, key(":offset"), self.offset]]
+
 ############################## REMOTE PROCEDURES ##############################
 
 def _mk_req(func, *args, **kwargs):
@@ -252,11 +286,14 @@ def _mk_req(func, *args, **kwargs):
       expected = "expected " + str(len(spec_args)) + " args " + str(spec_args) + ", "
       actual = "actual " + str(len(args)) + " args " + str(args) + " with types " + str(map(lambda a: type(a), args))
       raise Exception(preamble + expected + actual)
-  req.extend(args[1:]) # strip off self
+  for arg in args[1:]: # strip off self
+    if hasattr(arg, "unparse"): argreq = arg.unparse()
+    else: argreq = [arg]
+    req.extend(argreq)
   return req
 
 def async_rpc(*args):
-  parser = args[0] if args else lambda raw: not not raw
+  parser = args[0] if args else lambda raw: raw
   def wrapper(func):
     def wrapped(*args, **kwargs):
       self = args[0]
@@ -273,7 +310,7 @@ def async_rpc(*args):
   return wrapper
 
 def sync_rpc(*args):
-  parser = args[0] if args else lambda raw: not not raw
+  parser = args[0] if args else lambda raw: raw
   def wrapper(func):
     def wrapped(*args, **kwargs):
       self = args[0]
@@ -354,3 +391,9 @@ class Rpc(object):
 
   @sync_rpc(DebugBacktrace.parse)
   def debug_backtrace(self, thread_id, first_frame = 0, num_frames = -1): pass
+
+  @sync_rpc(DebugValue.parse)
+  def debug_value(self, debug_location): pass
+
+  @sync_rpc()
+  def debug_to_string(self, debug_location): pass

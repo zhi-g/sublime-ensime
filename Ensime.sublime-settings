@@ -31,6 +31,8 @@
   "breakpoint_icon": "circle",
   "debugfocus_scope": "ensime.debugfocus",
   "debugfocus_icon": "",
+  "stackfocus_scope": "ensime.stackfocus",
+  "stackfocus_icon": "",
 
   // debug settings
   "log_to_console": [],

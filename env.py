@@ -134,6 +134,9 @@ class EnsimeEnvironment(object):
     self.profile = None # launch config used in current debug session
     self.breakpoints = []
     self.focus = None
+    self.backtrace = None
+    self.stackframe = None
+    self.watchstate = None
     self._output = ""
 
     # load the session (if exists)
@@ -175,9 +178,9 @@ class EnsimeEnvironment(object):
     return Stack(self)
 
   @property
-  def locals(self):
-    from ensime import Locals
-    return Locals(self)
+  def watches(self):
+    from ensime import Watches
+    return Watches(self)
 
   # externalizable part of mutable state
 

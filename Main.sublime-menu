@@ -46,7 +46,7 @@
                       { "caption": "Resume", "command": "ensime_resume_debugger" },
                       { "caption": "Show output", "command": "ensime_show_output" },
                       { "caption": "Show stack", "command": "ensime_show_stack" },
-                      { "caption": "Show locals", "command": "ensime_show_locals" }
+                      { "caption": "Show watches", "command": "ensime_show_watches" }
                     ]
                   }
                 ]

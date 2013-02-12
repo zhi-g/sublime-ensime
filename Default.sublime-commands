@@ -40,8 +40,8 @@
     "command": "ensime_show_stack"
   },
   {
-    "caption": "Ensime: Debug Locals",
-    "command": "ensime_show_locals"
+    "caption": "Ensime: Debug Watches",
+    "command": "ensime_show_watches"
   },
   {
     "caption": "Ensime: Notes",
