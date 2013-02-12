@@ -1506,6 +1506,7 @@ class Debugger(EnsimeCommon):
     elif event.type == "death" or event.type == "disconnect":
       self.shutdown(erase_dashboard = False) # so that people can take a look later
       self.status_message("Debuggee has died" if event.type == "death" else "Debugger has disconnected")
+      self.redraw_all_debug_focuses()
     elif event.type == "output":
       self.env.output.append(event.body)
     elif event.type == "exception" or event.type == "breakpoint" or event.type == "step":
