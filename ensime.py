@@ -1263,7 +1263,8 @@ class EnsimeInspectTypeAtPoint(RunningProjectFileOnly, EnsimeTextCommand):
   def handle_reply(self, tpe):
     if tpe and tpe.name != "<notype>":
       if tpe.arrow_type:
-        summary = "method type"
+        # summary = "method type"
+        summary = tpe.name
       else:
         summary = tpe.full_name
         if tpe.type_args:
