@@ -78,7 +78,7 @@ class Type(ActiveRecord):
 class SymbolSearchResults(ActiveRecord):
   #  we override parse here because raw contains a List of SymbolSearchResult.
   # The ActiveRecord parse method expects raw to contain an object at this point
-  # and calls sexp_to_key_map. . 
+  # and calls sexp_to_key_map. .
   @classmethod
   def parse(cls, raw):
     if not raw: return None
@@ -212,10 +212,28 @@ class DebugObjectField(ActiveRecord):
     self.summary = m[":summary"]
     self.type_name = m[":type-name"]
 
+class DebugLocation(ActiveRecord):
+  def populate(self, m):
+    self.type = str(m[":type"])
+    if self.type == "reference":
+      self.object_id = m[":object-id"]
+    elif self.type == "element":
+      self.object_id = m[":object-id"]
+      self.index = m[":index"]
+    elif self.type == "field":
+      self.object_id = m[":object-id"]
+      self.field = m[":field"]
+    elif self.type == "slot":
+      self.thread_id = m[":thread-id"]
+      self.frame = m[":frame"]
+      self.offset = m[":offset"]
+    else:
+      raise Exception("unexpected debug location of type " + str(self.type) + ": " + str(m))
+
 ############################## REMOTE PROCEDURES ##############################
 
 def _mk_req(func, *args, **kwargs):
-  if kwargs: raise Exception("kwargs are not supported for " + str(func))
+  if kwargs: raise Exception("kwargs are not supported by the RPC proxy")
   req = []
   def translate_name(name):
     if name.startswith("_"): name = name[1:]
@@ -223,14 +241,17 @@ def _mk_req(func, *args, **kwargs):
     return name
   req.append(sym("swank:" + translate_name(func.__name__)))
   (spec_args, spec_varargs, spec_keywords, spec_defaults) = inspect.getargspec(func)
-  if len(spec_args) != len(args):
-    preamble = "argc mismatch in signature of " + str(func) + ": "
-    expected = "expected " + str(len(spec_args)) + " args " + str(spec_args) + ", "
-    actual = "actual " + str(len(args)) + " args " + str(args) + " with types " + str(map(lambda a: type(a), args))
-    raise Exception(preamble + expected + actual)
   if spec_varargs: raise Exception("varargs in signature of " + str(func))
   if spec_keywords: raise Exception("keywords in signature of " + str(func))
-  if spec_defaults: raise Exception("defaults in signature of " + str(func))
+  if len(spec_args) != len(args):
+    if len(args) < len(spec_args) and len(args) + len(spec_defaults) >= len(spec_args):
+      # everything's fine. we can use default values for parameters to provide arguments to the call
+      args += spec_defaults[len(spec_defaults) - len(spec_args) + len(args):]
+    else:
+      preamble = "argc mismatch in signature of " + str(func) + ": "
+      expected = "expected " + str(len(spec_args)) + " args " + str(spec_args) + ", "
+      actual = "actual " + str(len(args)) + " args " + str(args) + " with types " + str(map(lambda a: type(a), args))
+      raise Exception(preamble + expected + actual)
   req.extend(args[1:]) # strip off self
   return req
 
@@ -331,5 +352,5 @@ class Rpc(object):
   @async_rpc()
   def debug_continue(self, thread_id): pass
 
-  @async_rpc()
-  def debug_backtrace(self, thread_id, first_frame, num_frames): pass
+  @sync_rpc(DebugBacktrace.parse)
+  def debug_backtrace(self, thread_id, first_frame = 0, num_frames = -1): pass

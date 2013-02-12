@@ -314,6 +314,10 @@ class EnsimeToolView(EnsimeCommon):
   def clear(self):
     self._update_v("")
 
+  # TODO: ideally, rendering should only happen when a tool view is visible
+  # TODO: also, rendering should be asynchronous
+  # if you implement this, make sure to change correspond method signatures in rpc.py
+  # to say "@async_rpc" instead of "@sync_rpc"
   def refresh(self):
     if self.v != None:
       content = self.render() or ""
@@ -1514,15 +1518,16 @@ class Debugger(EnsimeCommon):
         # todo. how to I get to the details of this exception?
         rendered = "an exception has been thrown\n"
         self.env.output.append(rendered)
-      # sometimes thrown exceptions don't have file_name and/or line set
-      # I think it's best to ignore them for the time being
+      self.env.focus = Focus(event.thread_id, event.thread_name, event.file_name, event.line)
       if event.file_name and event.line:
-        self.env.focus = Focus(event.thread_id, event.thread_name, event.file_name, event.line)
+        focus_summary = str(event.file_name) + ", line " + str(event.line)
         self.env.w.open_file("%s:%d:%d" % (self.env.focus.file_name, self.env.focus.line, 1), sublime.ENCODED_POSITION)
-        self.redraw_all_debug_focuses()
-        self.env.stack.refresh()
-        self.env.locals.refresh()
-        self.status_message("Debugger has stopped at " + str(event.file_name) + ", line " + str(event.line))
+      else:
+        focus_summary = "an unknown location"
+      self.redraw_all_debug_focuses()
+      self.env.stack.refresh()
+      self.env.locals.refresh()
+      self.status_message("(" + str(event.type) + ") Debugger has stopped at " + str(focus_summary))
     self.redraw_status(self.w.active_view())
 
   def start(self):
@@ -1596,11 +1601,23 @@ class Stack(EnsimeToolView):
   def can_show(self):
     return self.env and self.env.focus
 
+  @property
   def name(self):
     return ENSIME_STACK_VIEW
 
   def render(self):
-    pass
+    # TODO: if we have multiple threads, show all of them
+    backtrace = self.rpc.debug_backtrace(self.env.focus.thread_id)
+    rendered = []
+    for frame in backtrace.frames:
+      code_location = str(frame.class_name) + "." + str(frame.method_name)
+      short_file_name = frame.pc_location.file_name
+      if short_file_name.startswith(self.env.project_root):
+        short_file_name = short_file_name[len(self.env.project_root):]
+        if short_file_name.startswith("/") or short_file_name.startswith("\\"): short_file_name = short_file_name[1:]
+      filesystem_location = str(short_file_name) + ":" + str(frame.pc_location.line)
+      rendered.append(code_location + " (" + filesystem_location + ")")
+    return "\n".join(rendered)
 
 class Locals(EnsimeToolView):
   def can_show(self):
