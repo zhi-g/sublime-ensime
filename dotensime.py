@@ -37,11 +37,7 @@ def load(window):
   return (None, None, bind(error_no_config, window))
 
 def error_no_config(window):
-  message = "Ensime has been unable to start, because you haven't yet created an Ensime project in this Sublime workspace."
-  message += "\n\n"
-  message += "Sublime will now try to create a project for you. Do you wish to proceed?"
-  if sublime.ok_cancel_dialog(message):
-    create(window, from_scratch = True)
+  create(window, from_noconfig = True)
 
 def error_bad_config(window, f, ex):
   exc_type, exc_value, exc_tb = ex
@@ -56,9 +52,9 @@ def error_bad_config(window, f, ex):
   if sublime.ok_cancel_dialog(message):
     edit(window)
 
-def create(window, from_scratch = False, from_sbt = False):
-  if bool(from_scratch) == bool(from_sbt):
-    print "incorrect arguments to create: from_scratch = " + str(from_scratch) + ", from_sbt = " + str(from_sbt)
+def create(window, from_noconfig = False, from_scratch = False, from_sbt = False):
+  if len(filter(lambda b: b, [from_noconfig, from_scratch, from_sbt])) != 1:
+    print "incorrect arguments to create: from_noconfig = " + str(from_noconfig) + ", from_scratch = " + str(from_scratch) + ", from_sbt = " + str(from_sbt)
     return None
 
   class DotensimeCreator(object):
@@ -67,46 +63,56 @@ def create(window, from_scratch = False, from_sbt = False):
 
     def do_create(self):
       if len(self.w.folders()) == 0:
-        message = "Ensime project cannot be created, because you either don't have a Sublime project "
-        message += "or don't have any folders associated with your Sublime project."
-        message += "\n\n"
-        message += "To use Ensime you need to have an active non-empty project. "
-        message += "Sublime will now try to initialize a project for you. "
+        message = "To use Ensime you need to have an active non-empty Sublime project, "
+        message += "therefore Sublime is going to initialize one for you. "
         message += "\n\n"
         message += "You will be shown a dialog that will let you select a root folder for the project. "
-        message += "After the root folder is selected, Sublime will create a configuration file in it. "
-        message += "Do you wish to proceed?"
-        if sublime.ok_cancel_dialog(message):
-          self.w.run_command("prompt_add_folder")
-          # if you don't do set_timeout, self.w.folders() won't be updated
-          sublime.set_timeout(self.post_prompt_add_folder, 0)
-          return
-
-      if len(self.w.folders()) > 1:
-        message = "A .ensime configuration file needs to be created in one of your project's folders."
-        message += "\n\n"
-        message += "Since you have multiple folders in the project, pick an appropriate folder in the dialog that will follow."
-        sublime.message_dialog(message)
-
-      if (len(self.w.folders())) == 1:
-        self.folder_selected(0)
+        message += "After the root folder is selected, Sublime will create a configuration file in it."
+        self.confirm_and_proceed(message, self.create_for_zero_folders)
+      elif len(self.w.folders()) == 1:
+        folder = self.w.folders()[0]
+        message = "Since you have a single folder in the project, namely: " + folder + ", "
+        message += "Sublime will use it to host the Ensime configuration file without further ado."
+        self.confirm_and_proceed(message, bind(self.create_for_single_folder, folder))
       else:
-        self.w.show_quick_panel(self.w.folders(), self.folder_selected)
+        message = "Since you have multiple folders in the project, pick an appropriate folder in the dialog that will follow."
+        self.confirm_and_proceed(message, bind(self.create_for_multiple_folders, self.w.folders()))
 
-    def post_prompt_add_folder(self):
-      if len(self.w.folders()) != 0:
-        self.do_create()
+    def confirm_and_proceed(self, message, cont):
+      pre = "Sublime will now try to create an Ensime project for you, which entails putting "
+      pre += "a .ensime configuration file in one of your project's folders."
+      pre += "\n\n"
+      if from_noconfig: pre = "Ensime has been unable to start, because you haven't yet created an Ensime project in this Sublime workspace.\n\n" + pre
+      post = " Do you wish to proceed?"
 
-    def folder_selected(self, selected_index):
+      if sublime.ok_cancel_dialog(pre + message + post):
+        cont()
+
+    def create_for_zero_folders(self):
+      self.w.run_command("prompt_add_folder")
+      # if you don't do set_timeout, self.w.folders() won't be updated
+      sublime.set_timeout(self.create_for_zero_folders_cont, 0)
+
+    def create_for_zero_folders_cont(self):
+      if len(self.w.folders()) == 1:
+        self.create_for_single_folder(self.w.folders()[0])
+
+    def create_for_multiple_folders(self, folders):
+      self.w.show_quick_panel(folders, self.create_for_multiple_folders_cont)
+
+    def create_for_multiple_folders_cont(self, selected_index):
       if selected_index != -1:
-        target_folder = self.w.folders()[selected_index]
-        if self.is_sbt(target_folder):
-          if from_sbt or self.confirm_sbt(target_folder):
-            self.fill_in_dot_ensime_from_sbt_project(target_folder)
-          else:
-            pass
+        selected_folder = self.w.folders()[selected_index]
+        self.create_for_single_folder(selected_folder)
+
+    def create_for_single_folder(self, folder):
+      if self.is_sbt(folder):
+        if from_sbt or self.confirm_sbt(folder):
+          self.fill_in_dot_ensime_from_sbt_project(folder)
         else:
-          self.fill_in_dot_ensime_with_mock_config(target_folder)
+          pass
+      else:
+        self.fill_in_dot_ensime_with_mock_config(folder)
 
     def is_sbt(self, project_root):
       has_sbt_files_in_root = filter(lambda f: f.endswith(".sbt"), os.listdir(project_root))
@@ -128,6 +134,18 @@ def create(window, from_scratch = False, from_sbt = False):
       message += "Do you wish to proceed?"
       return sublime.ok_cancel_dialog(message)
 
+    def fill_in_dot_ensime_with_pre_sbt_mock_config(self, project_root):
+      message = ";; Sublime is about to run the following shell command:\n"
+      message += ";;\n"
+      message += ";;    cd \"" + project_root + "\"\n"
+      message += ";;    sbt \"ensime generate\"\n"
+      message += ";;\n"
+      message += ";; In a moment a build panel will pop up and progressively display the output of SBT.\n"
+      message += ";; If everything goes well, this file will be filled in with an Ensime configuration filled in from your SBT project.\n"
+      message += ";; (In case if this buffer doesn't get updated after SBT finishes, click File > Revert File to forcibly reload the file from disk).\n"
+      message += ";; If something doesn't work, and you can't figure it out, feel free to contact us at dev@sublimescala.org.\n"
+      self.fill_in_dot_ensime_with_mock_config(project_root, message)
+
     def add_ensime_sbt_cmd_to_plugins(self, project_root):
       project_subfolder = os.path.join(project_root, "project")
       if not os.path.exists(project_subfolder): os.mkdir(project_subfolder)
@@ -147,24 +165,26 @@ def create(window, from_scratch = False, from_sbt = False):
         f.write(content)
 
     def run_ensime_generate(self, project_root):
+      self.w.open_file(project_root + os.sep + ".ensime")
       self.w.run_command("exec", {"cmd": ["sbt", "-Dsbt.log.noformat=true", "ensime generate"], "working_dir": project_root})
 
     def fill_in_dot_ensime_from_sbt_project(self, project_root):
+      self.fill_in_dot_ensime_with_pre_sbt_mock_config(project_root)
       self.add_ensime_sbt_cmd_to_plugins(project_root)
       self.run_ensime_generate(project_root)
 
-    def fill_in_dot_ensime_with_mock_config(self, project_root):
+    def fill_in_dot_ensime_with_mock_config(self, project_root, content = None):
       v = self.w.open_file(project_root + os.sep + ".ensime")
       if not v.size():
         # we have to do this in such a perverse way
         # because direct v.begin_edit() won't work
-        sublime.set_timeout(bind(self.fill_in_dot_ensime_with_mock_config_cont, project_root, v.file_name()), 0)
+        sublime.set_timeout(bind(self.fill_in_dot_ensime_with_mock_config_cont, project_root, v.file_name(), content), 0)
 
-    def fill_in_dot_ensime_with_mock_config_cont(self, project_root, dot_ensime_file):
+    def fill_in_dot_ensime_with_mock_config_cont(self, project_root, dot_ensime_file, content):
       for v in self.w.views():
         if v.file_name() == dot_ensime_file:
           e = v.begin_edit()
-          v.insert(e, 0, mock(self.w, project_root))
+          v.insert(e, 0, content or mock(self.w, project_root))
           v.end_edit(e)
           v.run_command("save")
 
