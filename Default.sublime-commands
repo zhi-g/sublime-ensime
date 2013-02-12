@@ -1,6 +1,10 @@
 [
   {
-    "caption": "Ensime: Log",
+    "caption": "Ensime: Client Log",
+    "command": "ensime_show_client_log"
+  },
+  {
+    "caption": "Ensime: Server Log",
     "command": "ensime_show_server_log"
   },
   {
