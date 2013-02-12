@@ -106,7 +106,7 @@ def create(window, from_noconfig = False, from_scratch = False, from_sbt = False
         self.create_for_single_folder(selected_folder)
 
     def create_for_single_folder(self, folder):
-      if self.is_sbt(folder):
+      if not from_scratch and self.is_sbt(folder):
         if from_sbt or self.confirm_sbt(folder):
           self.fill_in_dot_ensime_from_sbt_project(folder)
         else:
@@ -128,8 +128,10 @@ def create(window, from_noconfig = False, from_scratch = False, from_sbt = False
       message += "Sublime will now add the ensime-sbt-cmd plugin to your SBT build if it's not there yet "
       message += "and then run sbt \"ensime generate\". "
       message += "Console output will be redirected to a new buffer, so that you can track what's going on. "
+      message += "\n\n"
       message += "Should you ever need to regenerate Ensime configuration later, you can always run "
-      message += "Tools > Ensime > Maintenance > Create project from SBT. "
+      message += "Tools > Ensime > Maintenance > Create project from SBT. If you don't need help from SBT, "
+      message += "run Tools > Ensime > Maintenance > Create project from scratch."
       message += "\n\n"
       message += "Do you wish to proceed?"
       return sublime.ok_cancel_dialog(message)
