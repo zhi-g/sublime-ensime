@@ -1834,6 +1834,9 @@ class WatchRoot(WatchNode):
 
   def load_children(self):
     if self.env.stackframe:
+      if self.env.stackframe.this_object_id != "-1": # supposedly, this stands for "invalid value"
+        value = self.rpc.debug_value(DebugLocationReference(self.env.stackframe.this_object_id))
+        yield create_watch_value_node(self.env, self, "this", value)
       for i, local in enumerate(self.env.stackframe.locals):
         label = local.name
         # TODO: this, along with other stuff in WatchValueNode, should really be asynchronous
