@@ -1550,31 +1550,57 @@ class Debugger(EnsimeCommon):
       self.env.stack.clear()
       self.env.watches.clear()
 
+  def backup_layout(self, layout_profile):
+    if self.env.settings.get("debug_autolayout"):
+      layout_metadata = self.env.settings.get(layout_profile, {})
+      layout_metadata["layout"] = self.w.get_layout()
+      def backup_tool_layout(tool):
+        if tool.v != None:
+          g, i = self.w.get_view_index(tool.v)
+          layout_metadata[tool.name] = g
+        else:
+          layout_metadata[tool.name] = None
+      backup_tool_layout(self.env.stack)
+      backup_tool_layout(self.env.watches)
+      backup_tool_layout(self.env.output)
+      self.env.settings.set(layout_profile, layout_metadata)
+      sublime.save_settings("Ensime.sublime-settings")
+
+  def apply_layout(self, layout_profile):
+    if self.env.settings.get("debug_autolayout"):
+      layout_metadata = self.env.settings.get(layout_profile, {})
+      layout = layout_metadata.get("layout", None)
+      if layout:
+        self.w.set_layout(layout)
+        def apply_tool_layout(tool):
+          g = layout_metadata.get(tool.name, None)
+          if g != None:
+            v = tool.v if tool.v != None else tool._mk_v()
+            self.w.set_view_index(v, g, 0)
+          else:
+            if tool.v != None:
+              self.w.focus_view(tool.v)
+              self.w.run_command("close_file")
+            else:
+              pass
+        apply_tool_layout(self.env.stack)
+        apply_tool_layout(self.env.watches)
+        apply_tool_layout(self.env.output)
+
   def handle(self, event):
     if event.type == "start":
       self.shutdown(erase_dashboard = True)
       self.env.profile = self.env.profile_being_launched
       self.status_message("Debugger has successfully started")
-      if self.env.settings.get("debug_auto_layout") and self.w.num_groups() == 1:
-        v_stack = self.env.stack.v if self.env.stack.v != None else self.env.stack._mk_v()
-        v_watches = self.env.watches.v if self.env.watches.v != None else self.env.watches._mk_v()
-        self.w.run_command("create_pane", {"direction": "right"})
-        self.w.focus_group(1)
-        self.w.run_command("create_pane", {"direction": "down"})
-        self.w.set_view_index(v_stack, 1, 0)
-        self.w.set_view_index(v_watches, 2, 0)
+      self.backup_layout("debug_layout_when_leaving_debugmode")
+      self.apply_layout("debug_layout_when_entering_debugmode")
     elif event.type == "death" or event.type == "disconnect":
       self.shutdown(erase_dashboard = False) # so that people can take a look later
       self.status_message("Debuggee has died" if event.type == "death" else "Debugger has disconnected")
       self.redraw_all_debug_focuses()
       self.redraw_all_stack_focuses()
-      if self.env.settings.get("debug_auto_layout") and self.w.num_groups() == 3:
-        self.w.focus_group(1)
-        self.w.run_command("destroy_pane", {"direction": "down"})
-        self.w.run_command("close_file")
-        self.w.run_command("close_file")
-        self.w.focus_group(0)
-        self.w.run_command("destroy_pane", {"direction": "right"})
+      self.backup_layout("debug_layout_when_entering_debugmode")
+      self.apply_layout("debug_layout_when_leaving_debugmode")
     elif event.type == "output":
       self.env.output.append(event.body)
     elif event.type == "exception" or event.type == "breakpoint" or event.type == "step":

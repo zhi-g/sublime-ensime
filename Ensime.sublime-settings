@@ -45,7 +45,23 @@
 
   // miscellaneous settings
   "max_import_suggestions": 20,
-  "debug_auto_layout": true,
+  "debug_autolayout": true,
+  "debug_layout_when_entering_debugmode": {
+    "layout": {
+      "cells": [[0, 0, 1, 2], [1, 0, 2, 1], [1, 1, 2, 2]],
+      "rows": [0.0, 0.65, 1.0],
+      "cols": [0.0, 0.65, 1.0]
+    },
+    "Ensime stack": 1,
+    "Ensime watches": 2,
+    "Ensime output": null
+  },
+  "debug_layout_when_leaving_debugmode": {
+    "layout": null,
+    "Ensime stack": null,
+    "Ensime watches": null,
+    "Ensime output": null
+  },
   "debug_show_class": true,
   "debug_max_collection_elements_to_show": 0,
   "debug_specialcase_scala_collections": true
