@@ -45,5 +45,8 @@
 
   // miscellaneous settings
   "max_import_suggestions": 20,
-  "auto_layout_when_debugging": true
+  "debug_auto_layout": true,
+  "debug_show_class": true,
+  "debug_max_collection_elements_to_show": 1,
+  "debug_specialcase_scala_collections": true
 }

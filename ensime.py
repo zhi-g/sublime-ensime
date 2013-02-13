@@ -1555,7 +1555,7 @@ class Debugger(EnsimeCommon):
       self.shutdown(erase_dashboard = True)
       self.env.profile = self.env.profile_being_launched
       self.status_message("Debugger has successfully started")
-      if self.env.settings.get("auto_layout_when_debugging") and self.w.num_groups() == 1:
+      if self.env.settings.get("debug_auto_layout") and self.w.num_groups() == 1:
         v_stack = self.env.stack.v if self.env.stack.v != None else self.env.stack._mk_v()
         v_watches = self.env.watches.v if self.env.watches.v != None else self.env.watches._mk_v()
         self.w.run_command("create_pane", {"direction": "right"})
@@ -1568,7 +1568,7 @@ class Debugger(EnsimeCommon):
       self.status_message("Debuggee has died" if event.type == "death" else "Debugger has disconnected")
       self.redraw_all_debug_focuses()
       self.redraw_all_stack_focuses()
-      if self.env.settings.get("auto_layout_when_debugging") and self.w.num_groups() == 3:
+      if self.env.settings.get("debug_auto_layout") and self.w.num_groups() == 3:
         self.w.focus_group(1)
         self.w.run_command("destroy_pane", {"direction": "down"})
         self.w.run_command("close_file")
@@ -1799,6 +1799,8 @@ class WatchValueArrayNode(WatchValueReferenceNode):
     self.value = value
 
   def load_children(self):
+    if self.env.settings.get("debug_show_class"):
+      yield WatchValueLeaf(self.env, self, "class", self.value.type_name)
     for i in range(0, self.value.length):
       value = self.rpc.debug_value(DebugLocationElement(self.value.object_id, i))
       yield create_watch_value_node(self.env, self, "[" + str(i) + "]", value)
@@ -1809,6 +1811,8 @@ class WatchValueObjectNode(WatchValueReferenceNode):
     self.value = value
 
   def load_children(self):
+    if self.env.settings.get("debug_show_class"):
+      yield WatchValueLeaf(self.env, self, "class", self.value.type_name)
     for field in self.value.fields:
       value = self.rpc.debug_value(DebugLocationField(self.value.object_id, field.name))
       yield create_watch_value_node(self.env, self, field.name, value)
