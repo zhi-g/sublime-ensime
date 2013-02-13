@@ -109,9 +109,10 @@ class EnsimeCommon(object):
 
   def _invoke_all_colorers(self, method, *args):
     for i in range(0, self.w.num_groups()):
-      v = self.w.active_view_in_group(i)
-      colorer = Colorer(v)
-      getattr(colorer, method)(*args)
+      if self.w.views_in_group(i):
+        v = self.w.active_view_in_group(i)
+        colorer = Colorer(v)
+        getattr(colorer, method)(*args)
 
   def colorize(self, view = "default"): self._invoke_view_colorer("colorize", view)
   def colorize_all(self): self._invoke_all_colorers("colorize")
