@@ -104,9 +104,10 @@ def read_string(str):
   while(len(str) > 0):
     ch = str[0]
     if ch == '"' and not escaped:
-      return (s.replace("\\\\", "\\"),str[1:])
+      return (s,str[1:])
     elif escaped:
       escaped = False
+      s = s[:-1] # remove the escaping backslash
     elif ch == "\\":
       escaped = True
     s = s + ch
