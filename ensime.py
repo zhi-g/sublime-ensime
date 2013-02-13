@@ -1466,6 +1466,10 @@ class EnsimeStartDebugger(NotDebuggingOnly, EnsimeWindowCommand):
   def run(self):
     self.env.debugger.start()
 
+class EnsimeAttachDebugger(NotDebuggingOnly, EnsimeWindowCommand):
+  def run(self):
+    self.env.debugger.attach()
+
 class EnsimeStopDebugger(DebuggingOnly, EnsimeWindowCommand):
   def run(self):
     self.env.debugger.stop()
@@ -1637,6 +1641,22 @@ class Debugger(EnsimeCommon):
       self.rpc.debug_start(launch, self.env.breakpoints, callback)
     else:
       self.status_message("Bad debug configuration")
+
+  def attach(self):
+    last_address = self.env.settings.get("last_debug_attach_address", "localhost:1044")
+    self.w.show_input_panel("Address:", last_address, self.attach_cont)
+
+  def attach_cont(self, address):
+    if not re.match("^(?P<host>.*?):(?P<port>.*)$", address):
+      self.w.show_input_panel("Address:", address, self.attach_cont)
+      self.status_message("Wrong address format in " + address + ". Should be hostname:port.")
+    else:
+      self.status_message("Attaching the debugger...")
+      self.env.profile_being_launched = Launch(name = address, main_class = None, args = None)
+      def callback(status):
+        if status: self.status_message("Debugger has successfully attached to " + address)
+        else: self.status_message("Debugger has failed to attach to " + address)
+      self.rpc.debug_attach(address, self.env.breakpoints, callback)
 
   def stop(self):
     self.rpc.debug_stop()

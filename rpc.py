@@ -1,4 +1,4 @@
-import inspect, functools
+import inspect, functools, re
 from functools import partial as bind
 import sexp
 from sexp import key, sym
@@ -364,14 +364,11 @@ class Rpc(object):
   @async_rpc()
   def debug_clear_all_breaks(self): pass
 
-  @async_rpc(DebugStartResult.parse)
-  def _debug_start(self, command_line): pass
-
-  def debug_start(self, launch, breakpoints, on_complete = None):
+  def debug_kickoff(self, breakpoints, kickoff, on_complete):
     def set_breakpoints(breakpoints, status):
       if status:
         if breakpoints: self.debug_set_break(breakpoints[0].file_name, breakpoints[0].line, bind(set_breakpoints, breakpoints[1:]))
-        else: self._debug_start(launch.command_line)
+        else: kickoff()
       elif on_complete: on_complete(status)
     def clear_breakpoints():
       def callback(status):
@@ -379,6 +376,19 @@ class Rpc(object):
         elif on_complete: on_complete(status)
       self.debug_clear_all_breaks(callback)
     clear_breakpoints()
+
+  @async_rpc(DebugStartResult.parse)
+  def _debug_start(self, command_line): pass
+
+  def debug_start(self, launch, breakpoints, on_complete = None):
+    return debug_kickoff(breakpoints, bind(self._debug_start, launch.command_line), on_complete)
+
+  @async_rpc(DebugStartResult.parse)
+  def _debug_attach(self, host, port): pass
+
+  def debug_attach(self, address, breakpoints, on_complete = None):
+    m = re.match("^(?P<host>.*?):(?P<port>.*)$", address)
+    return debug_kickoff(breakpoints, bind(self._debug_attach, m.group("host"), m.group("port")), on_complete)
 
   @async_rpc()
   def debug_stop(self): pass

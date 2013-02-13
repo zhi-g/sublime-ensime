@@ -42,6 +42,7 @@
                       { "caption": "Toggle breakpoint", "command": "ensime_toggle_breakpoint" },
                       { "caption": "Clear breakpoints", "command": "ensime_clear_breakpoints" },
                       { "caption": "Start debugger", "command": "ensime_start_debugger" },
+                      { "caption": "Attach debugger", "command": "ensime_attach_debugger" },
                       { "caption": "Stop debugger", "command": "ensime_stop_debugger" },
                       { "caption": "Step into", "command": "ensime_step_into" },
                       { "caption": "Step over", "command": "ensime_step_over" },
