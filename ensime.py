@@ -1779,32 +1779,36 @@ class WatchValueLeaf(WatchNode):
   def load_description(self):
     return self._description
 
-class WatchValueArrayNode(WatchNode):
+class WatchValueReferenceNode(WatchNode):
   def __init__(self, env, parent, label, value):
-    super(WatchValueArrayNode, self).__init__(env, parent, label)
+    super(WatchValueReferenceNode, self).__init__(env, parent, label)
+    self.value = value
+
+  def load_description(self):
+    if self.value.length != 0:
+      result = self.env.rpc.debug_to_string(DebugLocationReference(self.value.object_id))
+      result = result if result != False else "<failed to evaluate>"
+      return result
+    else:
+      return "[]"
+
+class WatchValueArrayNode(WatchValueReferenceNode):
+  def __init__(self, env, parent, label, value):
+    super(WatchValueArrayNode, self).__init__(env, parent, label, value)
     self.value = value
 
   def load_children(self):
     for i in range(0, self.value.length):
       yield create_watch_value_node(self.env, self, "[" + str(i) + "]", DebugLocationElement(self.value.object_id, i))
 
-  def load_description(self):
-    if self.value.length:
-      return self.env.rpc.debug_to_string(DebugLocationReference(self.value.object_id))
-    else:
-      return "[]"
-
-class WatchValueObjectNode(WatchNode):
+class WatchValueObjectNode(WatchValueReferenceNode):
   def __init__(self, env, parent, label, value):
-    super(WatchValueObjectNode, self).__init__(env, parent, label)
+    super(WatchValueObjectNode, self).__init__(env, parent, label, value)
     self.value = value
 
   def load_children(self):
     for field in self.fields:
       yield create_watch_value_node(self.env, self, field.name, DebugLocationElement(self.value.object_id, field.name))
-
-  def load_description(self):
-    return self.env.rpc.debug_to_string(DebugLocationReference(self.value.object_id))
 
 def create_watch_value_node(env, parent, label, value):
   if str(value.type) == "null":
