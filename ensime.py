@@ -1427,8 +1427,8 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
 
 class EnsimeBuild(ProjectExists, EnsimeWindowCommand):
   def run(self):
-    sbt = sbt_binary()
-    if sbt: self.w.run_command("exec", {"cmd": [sbt, "-Dsbt.log.noformat=true"], "working_dir": self.env.project_root})
+    cmd = sbt_command()
+    if cmd: self.w.run_command("exec", {"cmd": cmd, "working_dir": self.env.project_root})
 
 ############################## SUBLIME COMMANDS: DEBUGGING ##############################
 

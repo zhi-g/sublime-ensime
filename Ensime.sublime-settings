@@ -37,6 +37,7 @@
 
   // build settings
   "sbt_binary": null, // overridden in Ensime (<os name>).sublime-settings
+  "sbt_flags": ["-Dsbt.log.noformat=true"],
 
   // miscellaneous settings
   "debug_autolayout": true,

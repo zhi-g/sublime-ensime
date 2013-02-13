@@ -167,8 +167,8 @@ def create(window, from_noconfig = False, from_scratch = False, from_sbt = False
 
     def run_ensime_generate(self, project_root):
       self.w.open_file(project_root + os.sep + ".ensime")
-      sbt = sbt_binary()
-      if sbt: self.w.run_command("exec", {"cmd": [sbt, "-Dsbt.log.noformat=true", "ensime generate"], "working_dir": project_root})
+      cmd = sbt_command("ensime generate")
+      if cmd: self.w.run_command("exec", {"cmd": cmd, "working_dir": project_root})
 
     def fill_in_dot_ensime_from_sbt_project(self, project_root):
       self.fill_in_dot_ensime_with_pre_sbt_mock_config(project_root)
