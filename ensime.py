@@ -1576,7 +1576,7 @@ class Debugger(EnsimeCommon):
         exception_type = self.rpc.debug_value(DebugLocationReference(event.exception_id)).type_name
         rendered = "an unhandled exception has been thrown: " + str(exception_type) + "\n"
         rendered += "\n".join(map(lambda line: "  " + line, self.env.stack.render().split("\n")))
-        self.env.output.append(rendered)
+        self.env.output.append(rendered + "\n")
         self.env.output.show()
       self.status_message("(" + str(event.type) + ") Debugger has stopped at " + str(focus_summary))
     self.redraw_status(self.w.active_view())
@@ -1637,13 +1637,13 @@ class Output(EnsimeToolView):
   def append(self, data):
     if data:
       self.env._output += data
-      if self.v:
+      if self.v != None:
         selection_was_at_end = len(self.v.sel()) == 1 and self.v.sel()[0] == sublime.Region(self.v.size())
-        edit = v.begin_edit()
-        v.insert(edit, v.size(), data)
+        edit = self.v.begin_edit()
+        self.v.insert(edit, self.v.size(), data)
         if selection_was_at_end:
-          v.show(v.size())
-        v.end_edit(edit)
+          self.v.show(self.v.size())
+        self.v.end_edit(edit)
 
   def render(self):
     return self.env._output
