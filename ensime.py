@@ -1765,6 +1765,7 @@ class WatchNode(EnsimeCommon):
   def visible_subtree(self):
     yield self
     if self.is_expanded:
+      # print self, self.label, self.children
       for child in self.children:
         for subsubnode in list(child.visible_subtree()):
           yield subsubnode
@@ -1794,31 +1795,67 @@ class WatchValueReferenceNode(WatchNode):
       return "[]"
 
   def load_children(self):
-    if self.env.settings.get("debug_show_class"):
+    if self.is_show_class():
       yield WatchValueLeaf(self.env, self, "class", self.value.type_name)
-    for key, value in self.enumerate_children():
-      yield create_watch_value_node(self.env, self, key, value)
+    for child_like in self.enumerate_children():
+      if type(child_like) == tuple:
+        key, value = child_like
+        yield create_watch_value_node(self.env, self, key, value)
+      else:
+        child = child_like
+        yield child
+
+  def is_show_class(self):
+    return self.env.settings.get("debug_show_class")
 
   def enumerate_children(self):
     raise Exception("abstract method: WatchValueReferenceNode.enumerate_children")
 
 class WatchValueCollectionNode(WatchValueReferenceNode):
-  def __init__(self, env, parent, label, value):
+  def __init__(self, env, parent, label, value, start):
     super(WatchValueCollectionNode, self).__init__(env, parent, label, value)
+    self.start = start
+
+  def is_show_class(self):
+    return self.env.settings.get("debug_show_class") and self.start == 0
 
   def enumerate_children(self):
-    for key, value in self.enumerate_elements():
+    threshold = self.env.settings.get("debug_max_collection_elements_to_show", 0)
+    for i, (key, value) in enumerate(self.enumerate_elements()):
+      if i == threshold and threshold > 0:
+        num_delayed = self.number_of_elements - i - self.start
+        delayed = self.shift(i)
+        quantifier = "element" if num_delayed == 1 else "elements"
+        delayed._description_loaded = True
+        delayed._description = "<" + str(num_delayed) + " more " + quantifier + ">"
+        yield delayed
+        return
       yield (key, value)
 
+  @property
+  def shift(self, label, start):
+    raise Exception("abstract method: WatchValueCollectionNode.shift")
+
+  @property
+  def number_of_elements(self):
+    raise Exception("abstract method: WatchValueCollectionNode.number_of_elements")
+
   def enumerate_elements(self):
-    raise Exception("abstract method: WatchValueCollectionNode.run")
+    raise Exception("abstract method: WatchValueCollectionNode.enumerate_elements")
 
 class WatchValueArrayNode(WatchValueCollectionNode):
-  def __init__(self, env, parent, label, value):
-    super(WatchValueArrayNode, self).__init__(env, parent, label, value)
+  def __init__(self, env, parent, label, value, start = 0):
+    super(WatchValueArrayNode, self).__init__(env, parent, label, value, start)
+
+  def shift(self, start):
+    return WatchValueArrayNode(self.env, self, "more", self.value, self.start + start)
+
+  @property
+  def number_of_elements(self):
+    return self.value.length
 
   def enumerate_elements(self):
-    for i in range(0, self.value.length):
+    for i in range(self.start, self.value.length):
       key = "[" + str(i) + "]"
       value = self.rpc.debug_value(DebugLocationElement(self.value.object_id, i))
       yield (key, value)
