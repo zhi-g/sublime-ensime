@@ -153,7 +153,7 @@ class DebugEvent(ActiveRecord):
     else:
       raise Exception("unexpected debug event of type " + str(self.type) + ": " + str(m))
 
-class DebugStartResult(ActiveRecord):
+class DebugKickoffResult(ActiveRecord):
   def __nonzero__(self):
     return not self.error
 
@@ -368,7 +368,7 @@ class Rpc(object):
     def set_breakpoints(breakpoints, status):
       if status:
         if breakpoints: self.debug_set_break(breakpoints[0].file_name, breakpoints[0].line, bind(set_breakpoints, breakpoints[1:]))
-        else: kickoff()
+        else: kickoff(on_complete)
       elif on_complete: on_complete(status)
     def clear_breakpoints():
       def callback(status):
@@ -377,18 +377,18 @@ class Rpc(object):
       self.debug_clear_all_breaks(callback)
     clear_breakpoints()
 
-  @async_rpc(DebugStartResult.parse)
+  @async_rpc(DebugKickoffResult.parse)
   def _debug_start(self, command_line): pass
 
   def debug_start(self, launch, breakpoints, on_complete = None):
     return debug_kickoff(breakpoints, bind(self._debug_start, launch.command_line), on_complete)
 
-  @async_rpc(DebugStartResult.parse)
+  @async_rpc(DebugKickoffResult.parse)
   def _debug_attach(self, host, port): pass
 
   def debug_attach(self, address, breakpoints, on_complete = None):
     m = re.match("^(?P<host>.*?):(?P<port>.*)$", address)
-    return debug_kickoff(breakpoints, bind(self._debug_attach, m.group("host"), m.group("port")), on_complete)
+    return self.debug_kickoff(breakpoints, bind(self._debug_attach, m.group("host"), m.group("port")), on_complete)
 
   @async_rpc()
   def debug_stop(self): pass
