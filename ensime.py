@@ -1731,6 +1731,9 @@ class WatchNode(EnsimeCommon):
     self._description_loaded = False
     self._description = None
 
+  def toggle(self):
+    self.is_expanded = not self.is_expanded
+
   def expand(self):
     self.is_expanded = True
 
@@ -1799,7 +1802,8 @@ class WatchValueArrayNode(WatchValueReferenceNode):
 
   def load_children(self):
     for i in range(0, self.value.length):
-      yield create_watch_value_node(self.env, self, "[" + str(i) + "]", DebugLocationElement(self.value.object_id, i))
+      value = self.rpc.debug_value(DebugLocationElement(self.value.object_id, i))
+      yield create_watch_value_node(self.env, self, "[" + str(i) + "]", value)
 
 class WatchValueObjectNode(WatchValueReferenceNode):
   def __init__(self, env, parent, label, value):
@@ -1807,8 +1811,9 @@ class WatchValueObjectNode(WatchValueReferenceNode):
     self.value = value
 
   def load_children(self):
-    for field in self.fields:
-      yield create_watch_value_node(self.env, self, field.name, DebugLocationElement(self.value.object_id, field.name))
+    for field in self.value.fields:
+      value = self.rpc.debug_value(DebugLocationField(self.value.object_id, field.name))
+      yield create_watch_value_node(self.env, self, field.name, value)
 
 def create_watch_value_node(env, parent, label, value):
   if str(value.type) == "null":
@@ -1858,13 +1863,16 @@ class Watches(EnsimeToolView):
     self.redraw_all_stack_focuses()
     self.refresh()
 
+  @property
+  def nodes(self):
+    return list(self.env.watchstate.visible_subtree())[1:] # strip off the root itself
+
   def render(self):
     rendered = []
     if self.env.watchstate:
-      ordered_nodes = list(self.env.watchstate.visible_subtree())[1:] # strip off the root itself
       def render_node(node):
         return "  " * (node.level - 1) + str(node.label) + " = " + str(node.description)
-      rendered.extend(map(render_node, ordered_nodes))
+      rendered.extend(map(render_node, self.nodes))
     return "\n".join(rendered)
 
   def setup_events(self, v):
@@ -1874,9 +1882,5 @@ class Watches(EnsimeToolView):
   def handle_event(self, event, target):
     if event == "double_click":
       row, _ = self.v.rowcol(target)
-      if self.env and self.env.stackframe:
-        locals = self.env.stackframe.locals
-        if row < len(locals):
-          local = locals[row]
-          # TODO: drill down into the local if possible, store the state in self.env.watchstate
-          pass
+      if row < len(self.nodes): self.nodes[row].toggle()
+      self.refresh()
