@@ -381,7 +381,7 @@ class Rpc(object):
   def _debug_start(self, command_line): pass
 
   def debug_start(self, launch, breakpoints, on_complete = None):
-    return debug_kickoff(breakpoints, bind(self._debug_start, launch.command_line), on_complete)
+    return self.debug_kickoff(breakpoints, bind(self._debug_start, launch.command_line), on_complete)
 
   @async_rpc(DebugKickoffResult.parse)
   def _debug_attach(self, host, port): pass

@@ -1651,6 +1651,8 @@ class Debugger(EnsimeCommon):
       self.w.show_input_panel("Address:", address, self.attach_cont, None, None)
       self.status_message("Wrong address format in " + address + ". Should be hostname:port.")
     else:
+      self.env.settings.set("last_debug_attach_address", address)
+      sublime.save_settings("Ensime.sublime-settings")
       self.status_message("Attaching the debugger...")
       self.env.profile_being_launched = dotsession.Launch(name = address, main_class = None, args = None)
       def callback(status):
@@ -1930,7 +1932,8 @@ def create_watch_value_node(env, parent, label, value):
   elif str(value.type) == "obj":
     def is_scala_collection(type_name):
       return type_name == "scala.collection.immutable.$colon$colon"
-    if self.env.settings.get("debug_specialcase_scala_collections") and is_scala_collection(value.type_name):
+    settings = sublime.load_settings("Ensime.sublime-settings")
+    if settings.get("debug_specialcase_scala_collections") and is_scala_collection(value.type_name):
       # TODO: implement reflective invocation API in Ensime and revisit this
       # manifest_any = <get Manifest.Any>
       # equivalent_array = <invoke value.toString(classtag_anyref)>
