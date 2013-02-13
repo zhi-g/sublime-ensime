@@ -1562,10 +1562,6 @@ class Debugger(EnsimeCommon):
     elif event.type == "output":
       self.env.output.append(event.body)
     elif event.type == "exception" or event.type == "breakpoint" or event.type == "step":
-      if event.type == "exception":
-        # TODO: how to I get to the details of this exception?
-        rendered = "an exception has been thrown\n"
-        self.env.output.append(rendered)
       self.env.focus = Focus(event.thread_id, event.thread_name, event.file_name, event.line)
       if event.file_name and event.line:
         focus_summary = str(event.file_name) + ", line " + str(event.line)
@@ -1574,6 +1570,14 @@ class Debugger(EnsimeCommon):
         focus_summary = "an unknown location"
       self.redraw_all_debug_focuses()
       self.env.stack.update_backtrace()
+      if event.type == "exception":
+        # TODO: debug_to_string doesn't work for exceptions
+        # rendered = self.rpc.debug_to_string(DebugLocationReference(event.exception_id))
+        exception_type = self.rpc.debug_value(DebugLocationReference(event.exception_id)).type_name
+        rendered = "an unhandled exception has been thrown: " + str(exception_type) + "\n"
+        rendered += "\n".join(map(lambda line: "  " + line, self.env.stack.render().split("\n")))
+        self.env.output.append(rendered)
+        self.env.output.show()
       self.status_message("(" + str(event.type) + ") Debugger has stopped at " + str(focus_summary))
     self.redraw_status(self.w.active_view())
 
