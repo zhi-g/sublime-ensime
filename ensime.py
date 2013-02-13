@@ -1593,18 +1593,19 @@ class Debugger(EnsimeCommon):
 
   def handle(self, event):
     if event.type == "start":
-      self.shutdown(erase_dashboard = True)
-      self.env.profile = self.env.profile_being_launched
-      self.status_message("Debugger has successfully started")
-      self.backup_layout("debug_layout_when_leaving_debugmode")
-      self.apply_layout("debug_layout_when_entering_debugmode")
+      if not self.env.profile: # avoid double initialization in the case of an attach to a suspended vm
+        self.shutdown(erase_dashboard = True)
+        self.env.profile = self.env.profile_being_launched
+        self.backup_layout("debug_layout_when_leaving_debugmode")
+        self.apply_layout("debug_layout_when_entering_debugmode")
     elif event.type == "death" or event.type == "disconnect":
-      self.shutdown(erase_dashboard = False) # so that people can take a look later
-      self.status_message("Debuggee has died" if event.type == "death" else "Debugger has disconnected")
-      self.redraw_all_debug_focuses()
-      self.redraw_all_stack_focuses()
-      self.backup_layout("debug_layout_when_entering_debugmode")
-      self.apply_layout("debug_layout_when_leaving_debugmode")
+      if self.env.profile: # this condition here is just to mirror the coniditon in event.type == "start"
+        self.shutdown(erase_dashboard = False) # so that people can take a look later
+        self.status_message("Debuggee has died" if event.type == "death" else "Debugger has disconnected")
+        self.redraw_all_debug_focuses()
+        self.redraw_all_stack_focuses()
+        self.backup_layout("debug_layout_when_entering_debugmode")
+        self.apply_layout("debug_layout_when_leaving_debugmode")
     elif event.type == "output":
       self.env.output.append(event.body)
     elif event.type == "exception" or event.type == "breakpoint" or event.type == "step":
@@ -1633,8 +1634,18 @@ class Debugger(EnsimeCommon):
       self.env.profile_being_launched = launch
       def callback(status):
         launch_name = " " + launch.name if launch.name else ""
-        if status: self.status_message("Debugger has successfully started" + launch_name)
-        else: self.status_message("Debugger has failed to start" + launch_name + ". " + str(status.details))
+        if status:
+          self.status_message("Debugger has successfully started" + launch_name)
+          if launch.remote_address:
+            # we have to apply this workaround, because if we attach to a non-suspended VM
+            # then we don't get the "start" event, and the plugin will think we've not entered the debug mode
+            # TODO: fix this at the root - in Ensime
+            class FakeStartEvent(object):
+              def __init__(self):
+                self.type = "start"
+            self.handle(FakeStartEvent())
+        else:
+          self.status_message("Debugger has failed to start" + launch_name + ". " + str(status.details))
       self.rpc.debug_start(launch, self.env.breakpoints, callback)
     else:
       self.status_message("Bad debug configuration")
