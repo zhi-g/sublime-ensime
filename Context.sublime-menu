@@ -42,7 +42,7 @@
               { "caption": "Stop debugger", "command": "ensime_stop_debugger" },
               { "caption": "Step into", "command": "ensime_step_into" },
               { "caption": "Step over", "command": "ensime_step_over" },
-              { "caption": "Resume", "command": "ensime_resume_debugger" },
+              { "caption": "Continue", "command": "ensime_continue_debugger" },
               { "caption": "Show output", "command": "ensime_show_output" },
               { "caption": "Show stack", "command": "ensime_show_stack" },
               { "caption": "Show watches", "command": "ensime_show_watches" }

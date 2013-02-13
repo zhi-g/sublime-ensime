@@ -1478,9 +1478,9 @@ class EnsimeStepOver(FocusedOnly, EnsimeWindowCommand):
   def run(self):
     self.env.debugger.step_over()
 
-class EnsimeResumeDebugger(FocusedOnly, EnsimeWindowCommand):
+class EnsimeContinueDebugger(FocusedOnly, EnsimeWindowCommand):
   def run(self):
-    self.env.debugger.resume()
+    self.env.debugger.continue_()
 
 class EnsimeSmartRunDebugger(EnsimeWindowCommand):
   def __init__(self, window):
@@ -1503,7 +1503,7 @@ class EnsimeSmartRunDebugger(EnsimeWindowCommand):
         else:
           self.startup_attempts = 0
     if self.env.focus:
-      self.w.run_command("ensime_resume_debugger")
+      self.w.run_command("ensime_continue_debugger")
 
 class EnsimeShowOutput(EnsimeWindowCommand):
   def is_enabled(self):
@@ -1659,7 +1659,7 @@ class Debugger(EnsimeCommon):
   def step_over(self):
     self.rpc.debug_next(self.env.focus.thread_id)
 
-  def resume(self):
+  def continue_(self):
     self.rpc.debug_continue(self.env.focus.thread_id)
 
 class Focus(object):
