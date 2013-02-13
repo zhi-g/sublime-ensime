@@ -21,6 +21,7 @@
   // performance settings
   "timeout_sync_roundtrip": 3,
   "timeout_completions": 1.0,
+  "max_import_suggestions": 20,
 
   // stylistic settings
   "error_highlight": true,
@@ -34,17 +35,7 @@
   "stackfocus_scope": "ensime.stackfocus",
   "stackfocus_icon": "",
 
-  // debug settings
-  "log_to_console": [],
-  "log_to_file": ["ui", "client", "server"],
-  "connect_to_external_server": false,
-  "external_server_port_file": "",
-  "os_independent_paths_in_dot_ensime": false,
-  "plugin_version": "0.6.0",
-  "min_ensime_server_version": "0.9.8.6",
-
   // miscellaneous settings
-  "max_import_suggestions": 20,
   "debug_autolayout": true,
   "debug_layout_when_entering_debugmode": {
     "layout": {
@@ -64,5 +55,14 @@
   },
   "debug_show_class": true,
   "debug_max_collection_elements_to_show": 0,
-  "debug_specialcase_scala_collections": true
+  "debug_specialcase_scala_collections": true,
+
+  // advanced settings
+  "log_to_console": [],
+  "log_to_file": ["ui", "client", "server"],
+  "connect_to_external_server": false,
+  "external_server_port_file": "",
+  "os_independent_paths_in_dot_ensime": false,
+  "plugin_version": "0.6.0",
+  "min_ensime_server_version": "0.9.8.6"
 }

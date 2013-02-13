@@ -1906,7 +1906,7 @@ def create_watch_value_node(env, parent, label, value):
   elif str(value.type) == "obj":
     def is_scala_collection(type_name):
       return type_name == "scala.collection.immutable.$colon$colon"
-    if is_scala_collection(value.type_name):
+    if self.env.settings.get("debug_specialcase_scala_collections") and is_scala_collection(value.type_name):
       # TODO: implement reflective invocation API in Ensime and revisit this
       # manifest_any = <get Manifest.Any>
       # equivalent_array = <invoke value.toString(classtag_anyref)>
