@@ -1789,7 +1789,7 @@ class WatchValueReferenceNode(WatchNode):
   def load_description(self):
     if self.value.length != 0:
       result = self.env.rpc.debug_to_string(self.env.focus.thread_id, DebugLocationReference(self.value.object_id))
-      result = result if result != False else "<failed to evaluate>"
+      result = result if result != False and result != None else "<failed to evaluate>"
       return result
     else:
       return "[]"
