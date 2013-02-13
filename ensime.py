@@ -1789,9 +1789,9 @@ class WatchValueArrayNode(WatchNode):
       yield create_watch_value_node(self.env, self, "[" + str(i) + "]", DebugLocationElement(self.value.object_id, i))
 
   def load_description(self):
-    if self.value.object_id:
+    if self.value.length:
       return self.env.rpc.debug_to_string(DebugLocationReference(self.value.object_id))
-    else: # empty array
+    else:
       return "[]"
 
 class WatchValueObjectNode(WatchNode):

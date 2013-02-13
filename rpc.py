@@ -28,6 +28,9 @@ class ActiveRecord(object):
   def unparse(self):
     raise Exception("abstract method: ActiveRecord.unparse")
 
+  def __str__(self):
+    return str(self.__dict__)
+
 class Note(ActiveRecord):
   def populate(self, m):
     self.message = m[":msg"]
@@ -200,7 +203,7 @@ class DebugValue(ActiveRecord):
     self.length = m[":length"] if ":length" in m else None
     self.element_type_name = m[":element-type-name"] if ":element-type-name" in m else None
     self.summary = m[":summary"] if ":summary" in m else None
-    self.object_id = m[":object_id"] if ":object_id" in m else None
+    self.object_id = m[":object-id"] if ":object-id" in m else None
     self.fields = DebugObjectField.parse_list(m[":fields"]) if ":fields" in m else []
     if str(self.type) == "null" or str(self.type) == "prim" or str(self.type) == "obj" or str(self.type) == "str" or str(self.type) == "arr":
       pass
