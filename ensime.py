@@ -1575,6 +1575,7 @@ class Debugger(EnsimeCommon):
         # rendered = self.rpc.debug_to_string(DebugLocationReference(event.exception_id))
         exception_type = self.rpc.debug_value(DebugLocationReference(event.exception_id)).type_name
         rendered = "an unhandled exception has been thrown: " + str(exception_type) + "\n"
+        # TODO: handle double click. it won't work for output, because it lacks a stack-like handler
         rendered += "\n".join(map(lambda line: "  " + line, self.env.stack.render().split("\n")))
         self.env.output.append(rendered + "\n")
         self.env.output.show()
