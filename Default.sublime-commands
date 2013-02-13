@@ -24,6 +24,10 @@
     "command": "ensime_show_session"
   },
   {
+    "caption": "Ensime: Build",
+    "command": "ensime_build"
+  },
+  {
     "caption": "Ensime: Debug Start",
     "command": "ensime_start_debugger"
   },

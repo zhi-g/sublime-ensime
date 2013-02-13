@@ -1424,7 +1424,9 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
         view.show(new_pos)
     on_load()
 
-
+class EnsimeBuild(ProjectExists, EnsimeWindowCommand):
+  def run(self):
+    pass
 
 ############################## SUBLIME COMMANDS: DEBUGGING ##############################
 
@@ -1981,3 +1983,4 @@ class Watches(EnsimeToolView):
 
   def clear_sel(self):
     self.v.sel().clear()
+

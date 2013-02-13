@@ -21,6 +21,9 @@ if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-e
 * Creates and understands `.ensime` projects (maximum one project per Sublime window,
   if you have a project with multiple subprojects only a single subproject will be available at a time).
 
+* Integrates with SBT to generate Ensime projects from SBT projects and provides
+  a command, which runs SBT compilation for the current Ensime project.
+
 * Once your Ensime project is configured (we have a helper for that) and Ensime is run,
   Scala files in that Ensime project benefit from a number of semantic services:
 
@@ -35,16 +38,9 @@ if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-e
     * Type-aware go to definition (implemented by `ensime_go_to_definition` command: bind it yourself
       to your favorite hotkey or use the default `Ctrl+Click` binding on Windows/Linux or `Cmd+Click` on Mac).
 
-* Does not compile the project for you. Use one of the established build tools (Ant,
-  Maven, SBT, etc) to do that.
-
-* Implements prototype support for debugging. At the moment you can set breakpoints, create launch
-  configurations and step through programs in the debugger. This is a very early prototype,
-  so it's unlikely that you'll be able to do anything useful with it, however it does illustrate
-  future development directions for this plugin.
-
-* Hosts ENSIME in a completely transparent fashion. Solves the problem of runaway processes
-  on Windows, Linux and Mac.
+* Implements experimental support for debugging. At the moment you can set breakpoints, create launch
+  configurations, step through programs in the debugger, inspect program output, navigate stack traces
+  and watch values of local variables. Things are far from smooth, but it might be worth a try.
 
 ## How to install?
 
@@ -98,9 +94,6 @@ and the server will initialize a resident instance of the Scala compiler.
 After the server is ready, a message will appear in the left-hand corner of the status bar.
 It will read either `ENSIME` if the currently opened file belongs to the active Ensime project
 or `ensime` if it doesn't. Keep an eye on this message - it's an indicator of things going well.
-
-Note that Ensime will not compile the project for you. Use one of the established build tools (Ant,
-Maven, SBT, etc) to do that.
 
 ## Contacts
 

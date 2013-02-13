@@ -35,6 +35,8 @@
   "stackfocus_scope": "ensime.stackfocus",
   "stackfocus_icon": "",
 
+  // build settings
+
   // miscellaneous settings
   "debug_autolayout": true,
   "debug_layout_when_entering_debugmode": {
