@@ -43,6 +43,7 @@
   "plugin_version": "0.6.0",
   "min_ensime_server_version": "0.9.8.5",
 
-  "max_import_suggestions": 20
-
+  // miscellaneous settings
+  "max_import_suggestions": 20,
+  "auto_layout_when_debugging": true
 }

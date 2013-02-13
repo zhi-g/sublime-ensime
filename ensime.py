@@ -1555,11 +1555,26 @@ class Debugger(EnsimeCommon):
       self.shutdown(erase_dashboard = True)
       self.env.profile = self.env.profile_being_launched
       self.status_message("Debugger has successfully started")
+      if self.env.settings.get("auto_layout_when_debugging") and self.w.num_groups() == 1:
+        v_stack = self.env.stack.v if self.env.stack.v != None else self.env.stack._mk_v()
+        v_watches = self.env.watches.v if self.env.watches.v != None else self.env.watches._mk_v()
+        self.w.run_command("create_pane", {"direction": "right"})
+        self.w.focus_group(1)
+        self.w.run_command("create_pane", {"direction": "down"})
+        self.w.set_view_index(v_stack, 1, 0)
+        self.w.set_view_index(v_watches, 2, 0)
     elif event.type == "death" or event.type == "disconnect":
       self.shutdown(erase_dashboard = False) # so that people can take a look later
       self.status_message("Debuggee has died" if event.type == "death" else "Debugger has disconnected")
       self.redraw_all_debug_focuses()
       self.redraw_all_stack_focuses()
+      if self.env.settings.get("auto_layout_when_debugging") and self.w.num_groups() == 3:
+        self.w.focus_group(1)
+        self.w.run_command("destroy_pane", {"direction": "down"})
+        self.w.run_command("close_file")
+        self.w.run_command("close_file")
+        self.w.focus_group(0)
+        self.w.run_command("destroy_pane", {"direction": "right"})
     elif event.type == "output":
       self.env.output.append(event.body)
     elif event.type == "exception" or event.type == "breakpoint" or event.type == "step":
