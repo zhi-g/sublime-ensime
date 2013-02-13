@@ -1793,29 +1793,45 @@ class WatchValueReferenceNode(WatchNode):
     else:
       return "[]"
 
-class WatchValueArrayNode(WatchValueReferenceNode):
-  def __init__(self, env, parent, label, value):
-    super(WatchValueArrayNode, self).__init__(env, parent, label, value)
-    self.value = value
-
   def load_children(self):
     if self.env.settings.get("debug_show_class"):
       yield WatchValueLeaf(self.env, self, "class", self.value.type_name)
+    for key, value in self.enumerate_children():
+      yield create_watch_value_node(self.env, self, key, value)
+
+  def enumerate_children(self):
+    raise Exception("abstract method: WatchValueReferenceNode.enumerate_children")
+
+class WatchValueCollectionNode(WatchValueReferenceNode):
+  def __init__(self, env, parent, label, value):
+    super(WatchValueCollectionNode, self).__init__(env, parent, label, value)
+
+  def enumerate_children(self):
+    for key, value in self.enumerate_elements():
+      yield (key, value)
+
+  def enumerate_elements(self):
+    raise Exception("abstract method: WatchValueCollectionNode.run")
+
+class WatchValueArrayNode(WatchValueCollectionNode):
+  def __init__(self, env, parent, label, value):
+    super(WatchValueArrayNode, self).__init__(env, parent, label, value)
+
+  def enumerate_elements(self):
     for i in range(0, self.value.length):
+      key = "[" + str(i) + "]"
       value = self.rpc.debug_value(DebugLocationElement(self.value.object_id, i))
-      yield create_watch_value_node(self.env, self, "[" + str(i) + "]", value)
+      yield (key, value)
 
 class WatchValueObjectNode(WatchValueReferenceNode):
   def __init__(self, env, parent, label, value):
     super(WatchValueObjectNode, self).__init__(env, parent, label, value)
-    self.value = value
 
-  def load_children(self):
-    if self.env.settings.get("debug_show_class"):
-      yield WatchValueLeaf(self.env, self, "class", self.value.type_name)
+  def enumerate_children(self):
     for field in self.value.fields:
+      key = field.name
       value = self.rpc.debug_value(DebugLocationField(self.value.object_id, field.name))
-      yield create_watch_value_node(self.env, self, field.name, value)
+      yield (key, value)
 
 def create_watch_value_node(env, parent, label, value):
   if str(value.type) == "null":
