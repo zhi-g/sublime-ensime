@@ -36,6 +36,7 @@
   "stackfocus_icon": "",
 
   // build settings
+  "sbt_binary": null, // overridden in Ensime (<os name>).sublime-settings
 
   // miscellaneous settings
   "debug_autolayout": true,

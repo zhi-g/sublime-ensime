@@ -3,6 +3,7 @@ from functools import partial as bind
 import sexp
 from sexp import key, sym
 from paths import *
+from sbt import *
 
 def locations(window):
   """Intelligently guess the appropriate .ensime file locations for the
@@ -84,9 +85,7 @@ def create(window, from_noconfig = False, from_scratch = False, from_sbt = False
       pre += "\n\n"
       if from_noconfig: pre = "Ensime has been unable to start, because you haven't yet created an Ensime project in this Sublime workspace.\n\n" + pre
       post = " Do you wish to proceed?"
-
-      if sublime.ok_cancel_dialog(pre + message + post):
-        cont()
+      if sublime.ok_cancel_dialog(pre + message + post): cont()
 
     def create_for_zero_folders(self):
       self.w.run_command("prompt_add_folder")
@@ -168,11 +167,8 @@ def create(window, from_noconfig = False, from_scratch = False, from_sbt = False
 
     def run_ensime_generate(self, project_root):
       self.w.open_file(project_root + os.sep + ".ensime")
-      if os.name == "nt":
-        cmd = ["sbt", "-Dsbt.log.noformat=true", "ensime generate"]
-      else:
-        cmd = ["bash", "-c", "sbt -Dsbt.log.noformat=true \"ensime generate\""]
-      self.w.run_command("exec", {"cmd": cmd, "working_dir": project_root})
+      sbt = sbt_binary()
+      if sbt: self.w.run_command("exec", {"cmd": [sbt, "-Dsbt.log.noformat=true", "ensime generate"], "working_dir": project_root})
 
     def fill_in_dot_ensime_from_sbt_project(self, project_root):
       self.fill_in_dot_ensime_with_pre_sbt_mock_config(project_root)

@@ -13,6 +13,7 @@ from sexp import key, sym
 from constants import *
 from paths import *
 from rpc import *
+from sbt import *
 
 class EnsimeCommon(object):
   def __init__(self, owner):
@@ -1426,7 +1427,8 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
 
 class EnsimeBuild(ProjectExists, EnsimeWindowCommand):
   def run(self):
-    pass
+    sbt = sbt_binary()
+    if sbt: self.w.run_command("exec", {"cmd": [sbt, "-Dsbt.log.noformat=true"], "working_dir": self.env.project_root})
 
 ############################## SUBLIME COMMANDS: DEBUGGING ##############################
 
