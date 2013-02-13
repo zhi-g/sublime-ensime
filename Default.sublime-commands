@@ -32,10 +32,6 @@
     "command": "ensime_start_debugger"
   },
   {
-    "caption": "Ensime: Debug Attach",
-    "command": "ensime_attach_debugger"
-  },
-  {
     "caption": "Ensime: Debug Stop",
     "command": "ensime_stop_debugger"
   },

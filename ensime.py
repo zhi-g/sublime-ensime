@@ -1466,10 +1466,6 @@ class EnsimeStartDebugger(NotDebuggingOnly, EnsimeWindowCommand):
   def run(self):
     self.env.debugger.start()
 
-class EnsimeAttachDebugger(NotDebuggingOnly, EnsimeWindowCommand):
-  def run(self):
-    self.env.debugger.attach()
-
 class EnsimeStopDebugger(DebuggingOnly, EnsimeWindowCommand):
   def run(self):
     self.env.debugger.stop()
@@ -1636,29 +1632,12 @@ class Debugger(EnsimeCommon):
       self.status_message("Starting the debugger...")
       self.env.profile_being_launched = launch
       def callback(status):
-        if status: self.status_message("Debugger has successfully started")
-        else: self.status_message("Debugger has failed to start. " + str(status.details))
+        launch_name = " " + launch.name if launch.name else ""
+        if status: self.status_message("Debugger has successfully started" + launch_name)
+        else: self.status_message("Debugger has failed to start" + launch_name + ". " + str(status.details))
       self.rpc.debug_start(launch, self.env.breakpoints, callback)
     else:
       self.status_message("Bad debug configuration")
-
-  def attach(self):
-    last_address = self.env.settings.get("last_debug_attach_address", "localhost:1044")
-    self.w.show_input_panel("Address:", last_address, self.attach_cont, None, None)
-
-  def attach_cont(self, address):
-    if not re.match("^(?P<host>.*?):(?P<port>.*)$", address):
-      self.w.show_input_panel("Address:", address, self.attach_cont, None, None)
-      self.status_message("Wrong address format in " + address + ". Should be hostname:port.")
-    else:
-      self.env.settings.set("last_debug_attach_address", address)
-      sublime.save_settings("Ensime.sublime-settings")
-      self.status_message("Attaching the debugger...")
-      self.env.profile_being_launched = dotsession.Launch(name = address, main_class = None, args = None)
-      def callback(status):
-        if status: self.status_message("Debugger has successfully attached to " + address)
-        else: self.status_message("Debugger has failed to attach to " + address + ". " + str(status.details))
-      self.rpc.debug_attach(address, self.env.breakpoints, callback)
 
   def stop(self):
     self.rpc.debug_stop()

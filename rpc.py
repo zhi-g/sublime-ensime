@@ -1,4 +1,4 @@
-import inspect, functools, re
+import inspect, functools
 from functools import partial as bind
 import sexp
 from sexp import key, sym
@@ -364,11 +364,20 @@ class Rpc(object):
   @async_rpc()
   def debug_clear_all_breaks(self): pass
 
-  def debug_kickoff(self, breakpoints, kickoff, on_complete):
+  @async_rpc(DebugKickoffResult.parse)
+  def _debug_start(self, command_line): pass
+
+  @async_rpc(DebugKickoffResult.parse)
+  def _debug_attach(self, host, port): pass
+
+  def debug_start(self, launch, breakpoints, on_complete = None):
     def set_breakpoints(breakpoints, status):
       if status:
         if breakpoints: self.debug_set_break(breakpoints[0].file_name, breakpoints[0].line, bind(set_breakpoints, breakpoints[1:]))
-        else: kickoff(on_complete)
+        else:
+          if launch.main_class: self._debug_start(launch.command_line, on_complete)
+          elif launch.remote_address: self._debug_attach(launch.remote_host, launch.remote_port, on_complete)
+          else: raise Exception("unsupported launch: " + str(launch))
       elif on_complete: on_complete(status)
     def clear_breakpoints():
       def callback(status):
@@ -376,19 +385,6 @@ class Rpc(object):
         elif on_complete: on_complete(status)
       self.debug_clear_all_breaks(callback)
     clear_breakpoints()
-
-  @async_rpc(DebugKickoffResult.parse)
-  def _debug_start(self, command_line): pass
-
-  def debug_start(self, launch, breakpoints, on_complete = None):
-    return self.debug_kickoff(breakpoints, bind(self._debug_start, launch.command_line), on_complete)
-
-  @async_rpc(DebugKickoffResult.parse)
-  def _debug_attach(self, host, port): pass
-
-  def debug_attach(self, address, breakpoints, on_complete = None):
-    m = re.match("^(?P<host>.*?):(?P<port>.*)$", address)
-    return self.debug_kickoff(breakpoints, bind(self._debug_attach, m.group("host"), m.group("port")), on_complete)
 
   @async_rpc()
   def debug_stop(self): pass

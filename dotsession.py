@@ -1,4 +1,4 @@
-import sublime, os, sys, traceback, json
+import sublime, os, sys, traceback, json, re
 from paths import *
 
 def location(env):
@@ -19,16 +19,19 @@ class Breakpoint(object):
     return not not self.file_name and self.line != None
 
 class Launch(object):
-  def __init__(self, name, main_class, args):
+  def __init__(self, name, main_class, args, remote_address):
     self.name = name or ""
     self.main_class = main_class or ""
     self.args = args or ""
+    self.remote_address = remote_address or ""
 
   def is_meaningful(self):
-    return self.name != "" or self.main_class != "" or self.args != ""
+    return self.name != "" or self.main_class != "" or self.args != "" or self.remote_address != ""
 
   def is_valid(self):
-    return not not self.main_class
+    mainclass_ok = not not self.main_class
+    remoteaddress_ok = not not self.remote_address and self._match_remote_address()
+    return mainclass_ok or remoteaddress_ok and (mainclass_ok != remoteaddress_ok)
 
   @property
   def command_line(self):
@@ -36,6 +39,17 @@ class Launch(object):
     if self.args:
       cmdline += (" " + self.args)
     return cmdline
+
+  def _match_remote_address(self):
+    return re.match("^(?P<host>.*?):(?P<port>.*)$", self.remote_address)
+
+  @property
+  def remote_host(self):
+    return self._match_remote_address().group("host")
+
+  @property
+  def remote_port(self):
+    return self._match_remote_address().group("port")
 
 class Session(object):
   def __init__(self, env, breakpoints, launches, launch_key):
@@ -66,7 +80,7 @@ def load(env):
       session = session or {}
       breakpoints = map(lambda b: Breakpoint(decode_path(b.get("file_name")), b.get("line")), session.get("breakpoints", []))
       breakpoints = filter(lambda b: b.is_meaningful(), breakpoints)
-      launches_list = map(lambda c: Launch(c.get("name"), c.get("main_class"), c.get("args")), session.get("launch_configs", []))
+      launches_list = map(lambda c: Launch(c.get("name"), c.get("main_class"), c.get("args"), c.get("remote_address")), session.get("launch_configs", []))
       launches = {}
       # todo. this might lose user data
       for c in launches_list: launches[c.name] = c
@@ -86,11 +100,11 @@ def save(env, data):
   if file_name:
     session = {}
     session["breakpoints"] = map(lambda b: {"file_name": encode_path(b.file_name), "line": b.line}, data.breakpoints)
-    session["launch_configs"] = map(lambda c: {"name": c.name, "main_class": c.main_class, "args": c.args}, data.launches.values())
+    session["launch_configs"] = map(lambda c: {"name": c.name, "main_class": c.main_class, "args": c.args, "remote_address": c.remote_address}, data.launches.values())
     session["current_launch_config"] = data.launch_key
     if not session["launch_configs"]:
       # create a dummy launch config, so that the user has easier time filling in the config
-      session["launch_configs"] = [{"name": "", "main_class": "", "args": ""}]
+      session["launch_configs"] = [{"name": "", "main_class": "", "args": "", "remote_address": ""}]
     contents = json.dumps(session, sort_keys=True, indent=2)
     with open(file_name, "w") as f:
       f.write(contents)
@@ -123,7 +137,7 @@ def load_launch(env):
   if not launch:
     message = "Your current " + session.launch_name + " is not present. "
     message += "\n\n"
-    message += "This happens because the \"current_launch_config\" field of the config "
+    message += "This error happened because the \"current_launch_config\" field of the config "
     if session.launch_key: config_status = "set to \"" + session.launch_key + "\""
     else: config_status = "set to an empty string"
     message += "(which is currently " + config_status + ") "
@@ -135,12 +149,12 @@ def load_launch(env):
     return None
 
   if not launch.is_valid():
-    message = "Your current " + session.launch_name + " doesn't specify the main class to start. "
+    message = "Your current " + session.launch_name + " is incorrect. "
     message += "\n\n"
     if session.launch_key: launch_description = "the entry named \"" + session.launch_key + "\""
     else: launch_description = "the default unnamed entry"
-    message += "This happens because " + launch_description + " in the \"launch_configs\" field of the launch configuration "
-    message += "does not have the \"main_class\" attribute set."
+    message += "This error happened because " + launch_description + " in the \"launch_configs\" field of the launch configuration "
+    message += "has neither the \"main_class\", nor the \"remote_address\" attribute set."
     message += "\n\n"
     message += "Sublime will now open the configuration file for you to fix. Do you wish to proceed?"
     if sublime.ok_cancel_dialog(message):
