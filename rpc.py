@@ -399,4 +399,4 @@ class Rpc(object):
   def debug_value(self, debug_location): pass
 
   @sync_rpc()
-  def debug_to_string(self, debug_location): pass
+  def debug_to_string(self, thread_id, debug_location): pass

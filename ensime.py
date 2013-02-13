@@ -1587,12 +1587,10 @@ class Debugger(EnsimeCommon):
       self.redraw_all_debug_focuses()
       self.env.stack.update_backtrace()
       if event.type == "exception":
-        # TODO: debug_to_string doesn't work for exceptions
-        # rendered = self.rpc.debug_to_string(DebugLocationReference(event.exception_id))
-        exception_type = self.rpc.debug_value(DebugLocationReference(event.exception_id)).type_name
-        rendered = "an unhandled exception has been thrown: " + str(exception_type) + "\n"
-        # TODO: handle double click. it won't work for output, because it lacks a stack-like handler
+        rendered = "an unhandled exception has been thrown: "
+        rendered += (str(self.rpc.debug_to_string(event.thread_id, DebugLocationReference(event.exception_id))) + "\n")
         rendered += "\n".join(map(lambda line: "  " + line, self.env.stack.render().split("\n")))
+        # TODO: handle double click. it won't work for output, because it lacks a stack-like handler
         self.env.output.append(rendered + "\n")
         self.env.output.show()
       self.status_message("(" + str(event.type) + ") Debugger has stopped at " + str(focus_summary))
@@ -1789,7 +1787,7 @@ class WatchValueReferenceNode(WatchNode):
 
   def load_description(self):
     if self.value.length != 0:
-      result = self.env.rpc.debug_to_string(DebugLocationReference(self.value.object_id))
+      result = self.env.rpc.debug_to_string(self.env.focus.thread_id, DebugLocationReference(self.value.object_id))
       result = result if result != False else "<failed to evaluate>"
       return result
     else:
