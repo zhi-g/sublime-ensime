@@ -1884,3 +1884,7 @@ class Watches(EnsimeToolView):
       row, _ = self.v.rowcol(target)
       if row < len(self.nodes): self.nodes[row].toggle()
       self.refresh()
+      sublime.set_timeout(self.clear_sel, 0)
+
+  def clear_sel(self):
+    self.v.sel().clear()
