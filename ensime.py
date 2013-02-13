@@ -1427,7 +1427,7 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
 
 class EnsimeBuild(ProjectExists, EnsimeWindowCommand):
   def run(self):
-    cmd = sbt_command()
+    cmd = sbt_command("compile") # TODO: make this configurable
     if cmd: self.w.run_command("exec", {"cmd": cmd, "working_dir": self.env.project_root})
 
 ############################## SUBLIME COMMANDS: DEBUGGING ##############################
