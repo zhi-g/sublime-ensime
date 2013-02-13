@@ -1878,7 +1878,16 @@ def create_watch_value_node(env, parent, label, value):
   elif str(value.type) == "str":
     return WatchValueLeaf(env, parent, label, value.summary)
   elif str(value.type) == "obj":
-    return WatchValueObjectNode(env, parent, label, value)
+    def is_scala_collection(type_name):
+      return type_name == "scala.collection.immutable.$colon$colon"
+    if is_scala_collection(value.type_name):
+      # TODO: implement reflective invocation API in Ensime and revisit this
+      # manifest_any = <get Manifest.Any>
+      # equivalent_array = <invoke value.toString(classtag_anyref)>
+      # return WatchValueArrayNode(env, parent, label, equivalentArray)
+      return WatchValueObjectNode(env, parent, label, value)
+    else:
+      return WatchValueObjectNode(env, parent, label, value)
   elif str(value.type) == "arr":
     return WatchValueArrayNode(env, parent, label, value)
   else:
