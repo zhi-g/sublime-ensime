@@ -791,7 +791,7 @@ class Server(ServerListener, EnsimeCommon):
         message += "required version is at least " + str(self.env.settings.get("min_ensime_server_version")) + "."
         message += "\n\n"
         message += "To update your Ensime server, download a suitable version from http://download.sublimescala.org, "
-        message += "and unpack it into the \"server\" subfolder of the SublimeEnsime plugin home, which is usually located at " + sublime.packages_path() + os.sep + "sublime-ensime. "
+        message += "and unpack it into the \"server\" subfolder of the SublimeEnsime plugin home, which is usually located at " + sublime.packages_path() + os.sep + "Ensime. "
         message += "Your installation is correct if inside the \"server\" subfolder there are folders named \"bin\" and \"lib\"."
         self.error_message(message)
         return
