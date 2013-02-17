@@ -13,10 +13,12 @@ and inspired us to kick off the project.
 ## Project status
 
 This is a beta version. Basic things will work (for example, error highlighting),
-but there might still be problems. Please, submit issues to our tracker
+but there might still be problems. Please submit issues to our tracker
 if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-ensime/issues/new.
 
 ## Features
+
+* Natively targets Scala 2.10.x, also supports Scala 2.9.x.
 
 * Creates and understands `.ensime` projects (maximum one project per Sublime window,
   if you have a project with multiple subprojects only a single subproject will be available at a time).
@@ -64,6 +66,13 @@ if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-e
 
     Download Ensime from http://download.sublimescala.org.
     The archive will contain a directory with an Ensime version.
+    
+    Make sure to download the build which matches your Scala version.
+    The primary development platform of Ensime is 2.10.x, but 2.9.x is supported as well
+    (though availability of builds of 2.9.x might lag behind). Every once in a while,
+    the plugin might undergo updates which will require fresh Ensime builds. If there's
+    no 2.9.x build of required version, please [ping us](https://github.com/sublimescala/sublime-ensime/issues/68)
+    or compile Ensime from sources (it's as easy as running `sbt ++2.9.2 package`).
 
     Extract the contents of this directory into the `server` subdirectory
     of just created `Ensime` directory. If you do everything correctly,
