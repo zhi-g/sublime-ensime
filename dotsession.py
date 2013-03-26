@@ -78,19 +78,19 @@ def load(env):
           contents = f.read()
           session = json.loads(contents)
       session = session or {}
-      breakpoints = map(lambda b: Breakpoint(decode_path(b.get("file_name")), b.get("line")), session.get("breakpoints", []))
-      breakpoints = filter(lambda b: b.is_meaningful(), breakpoints)
-      launches_list = map(lambda c: Launch(c.get("name"), c.get("main_class"), c.get("args"), c.get("remote_address")), session.get("launch_configs", []))
+      breakpoints = [Breakpoint(decode_path(b.get("file_name")), b.get("line")) for b in session.get("breakpoints", [])]
+      breakpoints = [b for b in breakpoints if b.is_meaningful()]
+      launches_list = [Launch(c.get("name"), c.get("main_class"), c.get("args"), c.get("remote_address")) for c in session.get("launch_configs", [])]
       launches = {}
       # todo. this might lose user data
       for c in launches_list: launches[c.name] = c
       launch_key = session.get("current_launch_config") or ""
       return Session(env, breakpoints, launches, launch_key)
     except:
-      print "Ensime: " + str(file_name) + " has failed to load"
+      print("Ensime: " + str(file_name) + " has failed to load")
       exc_type, exc_value, exc_tb = sys.exc_info()
       detailed_info = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-      print detailed_info
+      print(detailed_info)
       return None
   else:
     return None
@@ -99,8 +99,8 @@ def save(env, data):
   file_name = location(env)
   if file_name:
     session = {}
-    session["breakpoints"] = map(lambda b: {"file_name": encode_path(b.file_name), "line": b.line}, data.breakpoints)
-    session["launch_configs"] = map(lambda c: {"name": c.name, "main_class": c.main_class, "args": c.args, "remote_address": c.remote_address}, data.launches.values())
+    session["breakpoints"] = [{"file_name": encode_path(b.file_name), "line": b.line} for b in data.breakpoints]
+    session["launch_configs"] = [{"name": c.name, "main_class": c.main_class, "args": c.args, "remote_address": c.remote_address} for c in list(data.launches.values())]
     session["current_launch_config"] = data.launch_key
     if not session["launch_configs"]:
       # create a dummy launch config, so that the user has easier time filling in the config

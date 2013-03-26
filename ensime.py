@@ -14,6 +14,7 @@ from .constants import *
 from .paths import *
 from .rpc import *
 from .sbt import *
+import collections
 
 class EnsimeCommon(object):
   def __init__(self, owner):
@@ -63,7 +64,7 @@ class EnsimeCommon(object):
 
   def log_on_ui_thread(self, flavor, data):
     if flavor in self.env.settings.get("log_to_console", {}):
-      print data.strip()
+      print(data.strip())
     if flavor in self.env.settings.get("log_to_file", {}):
       try:
         if not os.path.exists(self.env.log_root):
@@ -73,7 +74,7 @@ class EnsimeCommon(object):
       except:
         exc_type, exc_value, exc_tb = sys.exc_info()
         detailed_info = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        print detailed_info
+        print(detailed_info)
 
   def is_valid(self):
     return self.env and self.env.valid
@@ -146,7 +147,7 @@ class EnsimeEventListenerProxy(EventListener):
   def __init__(self):
     def is_ensime_event_listener(member):
       return inspect.isclass(member) and member != EnsimeEventListener and issubclass(member, EnsimeEventListener)
-    self.listeners = map(lambda info: info[1], inspect.getmembers(sys.modules[__name__], is_ensime_event_listener))
+    self.listeners = [info[1] for info in inspect.getmembers(sys.modules[__name__], is_ensime_event_listener)]
 
   def _invoke(self, view, handler_name, *args):
     for listener in self.listeners:
@@ -205,7 +206,7 @@ class EnsimePreciseMouseCommand(EnsimeTextCommand):
   def _run_underlying(self, args):
     system_command = args["command"] if "command" in args else None
     if system_command:
-      system_args = dict({"event": args["event"]}.items() + args["args"].items())
+      system_args = dict(list({"event": args["event"]}.items()) + list(args["args"].items()))
       self.v.run_command(system_command, system_args)
 
   # note the underscore in "run_"
@@ -307,7 +308,7 @@ class EnsimeToolView(EnsimeCommon):
 
   @property
   def v(self):
-    wannabes = filter(lambda v: v.name() == self.name, self.w.views())
+    wannabes = [v for v in self.w.views() if v.name() == self.name]
     return wannabes[0] if wannabes else None
 
   def _mk_v(self):
@@ -448,7 +449,7 @@ class Client(ClientListener, EnsimeCommon):
     with open(port_file) as f: self.port = int(f.read())
     self.timeout = timeout
     self.init_counters()
-    methods = filter(lambda m: m[0].startswith("message_"), inspect.getmembers(self, predicate=inspect.ismethod))
+    methods = [m for m in inspect.getmembers(self, predicate=inspect.ismethod) if m[0].startswith("message_")]
     self.log_client("reflectively found " + str(len(methods)) + " message handlers: " + str(methods))
     self.handlers = dict((":" + m[0][len("message_"):].replace("_", "-"), (m[1], None, None)) for m in methods)
 
@@ -529,7 +530,7 @@ class Client(ClientListener, EnsimeCommon):
     handler, call_back_into_ui_thread, req_time = self.handlers.get(msg_id)
     if handler: del self.handlers[msg_id]
     def invoke_subscribed_handler(success, payload = None):
-      if callable(handler):
+      if isinstance(handler, collections.Callable):
         # only do async callbacks if the result is a success
         # however note that we need to ping sync callbacks in any case
         # in order to prevent freezes upon erroneous responses
@@ -761,7 +762,7 @@ class Server(ServerListener, EnsimeCommon):
   def verify_ensime_version(self):
     self.log_server("Verifying Ensime server version")
     ensime_jar_dir = self.env.server_path + os.sep + "lib"
-    ensime_jars = filter(os.path.isfile, glob.glob(ensime_jar_dir + os.sep + "ensime*.jar"))
+    ensime_jars = list(filter(os.path.isfile, glob.glob(ensime_jar_dir + os.sep + "ensime*.jar")))
     if len(ensime_jars) != 1:
       self.log_server("Error: no ensime*.jar files found in " + ensime_jar_dir)
       self.log_server("Warning: skipping the version check, proceeding with starting up the server")
@@ -780,7 +781,7 @@ class Server(ServerListener, EnsimeCommon):
       def parse_version(s):
         try:
           m = re.match(r"^(\d+)\.(\d+)(?:.(\d+)(?:.(\d+))?)?$", s)
-          return map(lambda s: int(s), filter(lambda s: s, m.groups()))
+          return [int(s) for s in [s for s in m.groups() if s]]
         except:
           self.log_server("Problems parsing version: " + s)
       aversion = parse_version(manifest["Implementation-Version"])
@@ -929,15 +930,13 @@ class Daemon(EnsimeEventListener):
     # print "on_modified"
     rs = self.v.get_regions(ENSIME_BREAKPOINT_REGION)
     if rs:
-      irrelevant_breakpoints = filter(
-        lambda b: not same_paths(b.file_name, self.v.file_name()),
-        self.env.breakpoints)
+      irrelevant_breakpoints = [b for b in self.env.breakpoints if not same_paths(b.file_name, self.v.file_name())]
       def new_breakpoint_position(r):
         lines = self.v.lines(r)
         if lines:
           (linum, _) = self.v.rowcol(lines[0].begin())
           return dotsession.Breakpoint(self.v.file_name(), linum + 1)
-      relevant_breakpoints = filter(lambda b: b, map(new_breakpoint_position, rs))
+      relevant_breakpoints = [b for b in map(new_breakpoint_position, rs) if b]
       self.env.breakpoints = irrelevant_breakpoints + relevant_breakpoints
       self.env.save_session()
       self.redraw_breakpoints()
@@ -1056,10 +1055,8 @@ class Colorer(EnsimeCommon):
       sublime.set_timeout(self.redraw_breakpoints, 100)
     else:
       if self.env:
-        relevant_breakpoints = filter(
-          lambda breakpoint: same_paths(
-            breakpoint.file_name, self.v.file_name()),
-          self.env.breakpoints)
+        relevant_breakpoints = [breakpoint for breakpoint in self.env.breakpoints if same_paths(
+            breakpoint.file_name, self.v.file_name())]
         regions = [self.v.full_line(self.v.text_point(breakpoint.line - 1, 0))
                    for breakpoint in relevant_breakpoints]
         self.v.add_regions(
@@ -1305,7 +1302,7 @@ class EnsimeInspectTypeAtPoint(RunningProjectFileOnly, EnsimeTextCommand):
       else:
         summary = tpe.full_name
         if tpe.type_args:
-          summary += ("[" + ", ".join(map(lambda t: t.name, tpe.type_args)) + "]")
+          summary += ("[" + ", ".join([t.name for t in tpe.type_args]) + "]")
       self.status_message(summary)
     else:
       self.status_message("Cannot find out type")
@@ -1398,7 +1395,7 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
   def handle_sugestions_response(self, info):
     # We only send one word in the request so there should only be one SymbolSearchResults in the response list
     results = info[0].results
-    names = map(lambda a: a.name, results)
+    names = [a.name for a in results]
     def do_refactor(i):
       if (i > -1):
         params = [sym('qualifiedName'), names[i], sym('file'), self.v.file_name(), sym('start'), 0,sym('end'), 0]
@@ -1439,9 +1436,7 @@ class EnsimeToggleBreakpoint(ProjectFileOnly, EnsimeTextCommand):
       zb_line, _ = self.v.rowcol(self.v.sel()[0].begin())
       line = zb_line + 1
       old_breakpoints = self.env.breakpoints
-      new_breakpoints = filter(
-        lambda b: not (same_paths(b.file_name, file_name) and b.line == line),
-        self.env.breakpoints)
+      new_breakpoints = [b for b in self.env.breakpoints if not (same_paths(b.file_name, file_name) and b.line == line)]
       if len(old_breakpoints) == len(new_breakpoints):
         # add
         new_breakpoints.append(dotsession.Breakpoint(file_name, line))
@@ -1620,7 +1615,7 @@ class Debugger(EnsimeCommon):
       if event.type == "exception":
         rendered = "an unhandled exception has been thrown: "
         rendered += (str(self.rpc.debug_to_string(event.thread_id, DebugLocationReference(event.exception_id))) + "\n")
-        rendered += "\n".join(map(lambda line: "  " + line, self.env.stack.render().split("\n")))
+        rendered += "\n".join(["  " + line for line in self.env.stack.render().split("\n")])
         # TODO: handle double click. it won't work for output, because it lacks a stack-like handler
         self.env.output.append(rendered + "\n")
         self.env.output.show()
@@ -1982,7 +1977,7 @@ class Watches(EnsimeToolView):
     if self.env.watchstate:
       def render_node(node):
         return "  " * (node.level - 1) + str(node.label) + " = " + str(node.description)
-      rendered.extend(map(render_node, self.nodes))
+      rendered.extend(list(map(render_node, self.nodes)))
     return "\n".join(rendered)
 
   def setup_events(self, v):

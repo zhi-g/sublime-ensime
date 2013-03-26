@@ -2,6 +2,7 @@ import inspect, functools
 from functools import partial as bind
 from . import sexp
 from .sexp import key, sym
+import collections
 
 ############################## DATA STRUCTURES ##############################
 
@@ -154,7 +155,7 @@ class DebugEvent(ActiveRecord):
       raise Exception("unexpected debug event of type " + str(self.type) + ": " + str(m))
 
 class DebugKickoffResult(ActiveRecord):
-  def __nonzero__(self):
+  def __bool__(self):
     return not self.error
 
   def populate(self, m):
@@ -287,7 +288,7 @@ def _mk_req(func, *args, **kwargs):
     else:
       preamble = "argc mismatch in signature of " + str(func) + ": "
       expected = "expected " + str(len(spec_args)) + " args " + str(spec_args) + ", "
-      actual = "actual " + str(len(args)) + " args " + str(args) + " with types " + str(map(lambda a: type(a), args))
+      actual = "actual " + str(len(args)) + " args " + str(args) + " with types " + str([type(a) for a in args])
       raise Exception(preamble + expected + actual)
   for arg in args[1:]: # strip off self
     if hasattr(arg, "unparse"): argreq = arg.unparse()
@@ -300,7 +301,7 @@ def async_rpc(*args):
   def wrapper(func):
     def wrapped(*args, **kwargs):
       self = args[0]
-      if callable(args[-1]):
+      if isinstance(args[-1], collections.Callable):
         on_complete = args[-1]
         args = args[:-1]
       else: on_complete = None

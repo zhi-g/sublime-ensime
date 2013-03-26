@@ -43,7 +43,7 @@ def error_no_config(window):
 def error_bad_config(window, f, ex):
   exc_type, exc_value, exc_tb = ex
   detailed_info = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-  print detailed_info
+  print(detailed_info)
   message = "Ensime has failed to parse the .ensime configuration file at " + str(f) + " because of the following error: "
   message += "\n\n"
   message += (str(exc_type) + ": "+ str(exc_value))
@@ -54,8 +54,8 @@ def error_bad_config(window, f, ex):
     edit(window)
 
 def create(window, from_noconfig = False, from_scratch = False, from_sbt = False):
-  if len(filter(lambda b: b, [from_noconfig, from_scratch, from_sbt])) != 1:
-    print "incorrect arguments to create: from_noconfig = " + str(from_noconfig) + ", from_scratch = " + str(from_scratch) + ", from_sbt = " + str(from_sbt)
+  if len([b for b in [from_noconfig, from_scratch, from_sbt] if b]) != 1:
+    print("incorrect arguments to create: from_noconfig = " + str(from_noconfig) + ", from_scratch = " + str(from_scratch) + ", from_sbt = " + str(from_sbt))
     return None
 
   class DotensimeCreator(object):
@@ -114,7 +114,7 @@ def create(window, from_noconfig = False, from_scratch = False, from_sbt = False
         self.fill_in_dot_ensime_with_mock_config(folder)
 
     def is_sbt(self, project_root):
-      has_sbt_files_in_root = filter(lambda f: f.endswith(".sbt"), os.listdir(project_root))
+      has_sbt_files_in_root = [f for f in os.listdir(project_root) if f.endswith(".sbt")]
       has_project_subfolder = os.path.exists(os.path.join(project_root, "project"))
       return has_sbt_files_in_root or has_project_subfolder
 
@@ -211,14 +211,14 @@ def mock(window, root):
       # and split into a list of lines:
       lines = docstring.expandtabs().splitlines()
       # Determine minimum indentation (first line doesn't count):
-      indent = sys.maxint
+      indent = sys.maxsize
       for line in lines[1:]:
           stripped = line.lstrip()
           if stripped:
               indent = min(indent, len(line) - len(stripped))
       # Remove indentation (first line is special):
       trimmed = [lines[0].strip()]
-      if indent < sys.maxint:
+      if indent < sys.maxsize:
           for line in lines[1:]:
               trimmed.append(line[indent:].rstrip())
       # Strip off trailing and leading blank lines:
@@ -267,9 +267,9 @@ def mock(window, root):
   contents = trim(contents)
 
   lines = contents.splitlines()
-  iof = (i for i, line in enumerate(lines) if line.strip() == "$SOURCE-ROOTS").next()
+  iof = next((i for i, line in enumerate(lines) if line.strip() == "$SOURCE-ROOTS"))
   indent = " " * lines[iof].index("$")
-  lines = lines[:iof] + map(lambda f: indent + "\"" + f.replace("\\", "/") + "\"", window.folders()) + lines[(iof + 1):]
+  lines = lines[:iof] + [indent + "\"" + f.replace("\\", "/") + "\"" for f in window.folders()] + lines[(iof + 1):]
   return '\n'.join(lines)
 
 def select_subproject(conf, window, on_complete):

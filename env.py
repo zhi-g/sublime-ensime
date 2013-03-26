@@ -51,7 +51,7 @@ class EnsimeEnvironment(object):
           if str(key) in literal_keys:
             config[i + 1] = decode_path(config[i + 1])
           elif str(key) in list_keys:
-            config[i + 1] = map(lambda path: decode_path(path), config[i + 1])
+            config[i + 1] = [decode_path(path) for path in config[i + 1]]
           else:
             pass
           i += 2
@@ -103,13 +103,13 @@ class EnsimeEnvironment(object):
             self.per_file_cache[file_name] = []
           self.per_file_cache[file_name].append(datum)
       def filter(self, pred):
-        dropouts = set(map(lambda n: self.normalized_cache[n.file_name], filter(lambda n: not pred(n), self.data)))
+        dropouts = set([self.normalized_cache[n.file_name] for n in [n for n in self.data if not pred(n)]])
         # doesn't take into account pathological cases when a "*.scala" file
         # is actually a symlink to something without a ".scala" extension
-        for file_name in self.per_file_cache.keys():
+        for file_name in list(self.per_file_cache.keys()):
           if file_name in dropouts:
             del self.per_file_cache[file_name]
-        self.data = filter(pred, self.data)
+        self.data = list(filter(pred, self.data))
       def clear(self):
         self.filter(lambda f: False)
       def for_file(self, file_name):

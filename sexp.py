@@ -20,7 +20,7 @@ def sexp_to_key_map(sexp):
     try:
       key_type = type(key(":key"))
       result = {}
-      for i in xrange(0, len(sexp), 2):
+      for i in range(0, len(sexp), 2):
           k,val = sexp[i],sexp[i+1]
           if type(k) == key_type:
               result[str(k)] = val
@@ -43,9 +43,9 @@ def read_relaxed(s):
   Unlike `read` this function allows ; comments
   and is more forgiving w.r.t whitespaces."""
   lines = s.splitlines()
-  lines = map(lambda line: line.strip(), lines)
-  lines = filter(lambda line: line, lines)
-  lines = filter(lambda line: not line.startswith(";"), lines)
+  lines = [line.strip() for line in lines]
+  lines = [line for line in lines if line]
+  lines = [line for line in lines if not line.startswith(";")]
   s = '\n'.join(lines)
   return read_form(s)[0]
 
@@ -212,7 +212,7 @@ def atom_to_str(exp):
     return "nil"
   elif type(exp) == Symbol:
     return exp.val
-  elif isinstance(exp, basestring):
+  elif isinstance(exp, str):
     return "\"" + exp.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
   else:
     return str(exp)
@@ -220,20 +220,20 @@ def atom_to_str(exp):
 def repl(prompt='lis.py> '):
   "A prompt-read-eval-print loop."
   while True:
-    val = eval(parse(raw_input(prompt)))
-    if val is not None: print to_string(val)
+    val = eval(parse(input(prompt)))
+    if val is not None: print(to_string(val))
 
 
 if __name__ == "__main__":
-  print(str(read("nil")))
-  print(str(read("(\"a b c\")")))
-  print(str(read("(a b c)")))
-  print(str(read("(:notes (:notes ((:file \"/Users/aemon/projects/cutey_ape/googleclient/experimental/qt_ape/src/apeoutlinemodel.cpp\" :line 37 :col 100 :beg nil :end nil :severity error :msg \"expected ')'\"))))")))
-  print(str(read("-4342323")))
-  print(str(read(":dude")))
-  print(str(read("ape")))
-  print(str(read("((((((nil))))))")))
-  print(str(read("\"hello \\face\"")))
-  print(str(read("\"hello \\fa\\\"ce\"")))
-  print(str(read("(:swank-rpc (swank:connection-info) 1)")))
-  print(to_string([7147L, [['+', 6227, u'a\n    an'], ['-', 7137, 7138]]]))
+  print((str(read("nil"))))
+  print((str(read("(\"a b c\")"))))
+  print((str(read("(a b c)"))))
+  print((str(read("(:notes (:notes ((:file \"/Users/aemon/projects/cutey_ape/googleclient/experimental/qt_ape/src/apeoutlinemodel.cpp\" :line 37 :col 100 :beg nil :end nil :severity error :msg \"expected ')'\"))))"))))
+  print((str(read("-4342323"))))
+  print((str(read(":dude"))))
+  print((str(read("ape"))))
+  print((str(read("((((((nil))))))"))))
+  print((str(read("\"hello \\face\""))))
+  print((str(read("\"hello \\fa\\\"ce\""))))
+  print((str(read("(:swank-rpc (swank:connection-info) 1)"))))
+  print((to_string([7147, [['+', 6227, 'a\n    an'], ['-', 7137, 7138]]])))
