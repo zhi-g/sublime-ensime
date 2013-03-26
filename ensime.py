@@ -5,7 +5,7 @@ import os, threading, _thread, socket, getpass, signal, glob
 import subprocess, tempfile, datetime, time, json, zipfile
 import functools, inspect, traceback, random, re, sys
 from functools import partial as bind
-from string import strip
+#from string import strip
 from types import *
 from . import env, diff, dotensime, dotsession, rpc
 from . import sexp
@@ -1676,7 +1676,7 @@ class Focus(object):
 
 class Output(EnsimeToolView):
   def can_show(self):
-    return self.env._output
+    return (not self.env._output)
 
   @property
   def name(self):
@@ -1702,7 +1702,10 @@ class Output(EnsimeToolView):
 
 class Stack(EnsimeToolView):
   def can_show(self):
-    return self.env and self.env.focus
+    if (self.env and self.env.focus):
+      return True
+    else:
+      return False
 
   @property
   def name(self):
@@ -1951,7 +1954,11 @@ class WatchRoot(WatchNode):
 
 class Watches(EnsimeToolView):
   def can_show(self):
-    return self.env and self.env.focus
+    if self.env and self.env.focus:
+      return True
+    else:
+      return False
+
 
   @property
   def name(self):
