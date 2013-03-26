@@ -1,7 +1,7 @@
 import inspect, functools
 from functools import partial as bind
-import sexp
-from sexp import key, sym
+from . import sexp
+from .sexp import key, sym
 
 ############################## DATA STRUCTURES ##############################
 

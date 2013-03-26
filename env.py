@@ -1,8 +1,8 @@
 import sublime
 import threading, uuid
 from uuid import uuid4
-import dotensime, dotsession
-from paths import *
+from . import dotensime, dotsession
+from .paths import *
 
 envLock = threading.RLock()
 ensime_envs = {}
@@ -30,7 +30,7 @@ class EnsimeEnvironment(object):
 
   def __deferred_init__(self):
     self.recalc()
-    from ensime import Daemon
+    from .ensime import Daemon
     v = self.w.active_view()
     if v != None: Daemon(v).on_activated() # recolorize
 
@@ -154,32 +154,32 @@ class EnsimeEnvironment(object):
 
   @property
   def rpc(self):
-    from rpc import Rpc
+    from .rpc import Rpc
     return Rpc(self)
 
   @property
   def notes(self):
-    from ensime import Notes
+    from .ensime import Notes
     return Notes(self)
 
   @property
   def debugger(self):
-    from ensime import Debugger
+    from .ensime import Debugger
     return Debugger(self)
 
   @property
   def output(self):
-    from ensime import Output
+    from .ensime import Output
     return Output(self)
 
   @property
   def stack(self):
-    from ensime import Stack
+    from .ensime import Stack
     return Stack(self)
 
   @property
   def watches(self):
-    from ensime import Watches
+    from .ensime import Watches
     return Watches(self)
 
   # externalizable part of mutable state

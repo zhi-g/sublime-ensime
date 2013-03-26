@@ -1,19 +1,19 @@
 import sublime
 from sublime import *
 from sublime_plugin import *
-import os, threading, thread, socket, getpass, signal, glob
+import os, threading, _thread, socket, getpass, signal, glob
 import subprocess, tempfile, datetime, time, json, zipfile
 import functools, inspect, traceback, random, re, sys
 from functools import partial as bind
 from string import strip
 from types import *
-import env, diff, dotensime, dotsession, rpc
-import sexp
-from sexp import key, sym
-from constants import *
-from paths import *
-from rpc import *
-from sbt import *
+from . import env, diff, dotensime, dotsession, rpc
+from . import sexp
+from .sexp import key, sym
+from .constants import *
+from .paths import *
+from .rpc import *
+from .sbt import *
 
 class EnsimeCommon(object):
   def __init__(self, owner):

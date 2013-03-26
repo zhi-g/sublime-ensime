@@ -1,5 +1,5 @@
 import sublime, os, sys, traceback, json, re
-from paths import *
+from .paths import *
 
 def location(env):
   return env.session_file
