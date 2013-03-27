@@ -373,7 +373,7 @@ class ClientSocket(EnsimeCommon):
           msglen = int(msglen, 16)
           # self.log_client("RECV: incoming message of " + str(msglen) + " bytes")
 
-          buf = ""
+          buf = b""
           while len(buf) < msglen:
             chunk = self.socket.recv(msglen - len(buf))
             if chunk:
@@ -381,7 +381,7 @@ class ClientSocket(EnsimeCommon):
               buf += chunk
             else:
               raise Exception("fatal error: recv returned None")
-          self.log_client("RECV: " + buf)
+          self.log_client("RECV: " + buf.decode('utf-8'))
 
           try:
             s = buf.decode('utf-8')
@@ -488,7 +488,7 @@ class Client(ClientListener, EnsimeCommon):
 
     self.feedback(msg_str)
     self.log_client("SEND SYNC REQ: " + msg_str)
-    self.socket.send(msg_str)
+    self.socket.send(msg_str.encode('utf-8'))
 
     max_wait = timeout or self.timeout
     event.wait(max_wait)
@@ -695,10 +695,10 @@ class ServerProcess(EnsimeCommon):
     self.log_server("started ensime server with pid " + str(self.proc.pid))
 
     if self.proc.stdout:
-      thread.start_new_thread(self.read_stdout, ())
+      _thread.start_new_thread(self.read_stdout, ())
 
     if self.proc.stderr:
-      thread.start_new_thread(self.read_stderr, ())
+      _thread.start_new_thread(self.read_stderr, ())
 
   def kill(self):
     if not self.killed:
@@ -850,7 +850,7 @@ class Controller(EnsimeCommon, ClientListener, ServerListener):
       raise
 
   def on_server_data(self, data):
-    if not self.env.running and re.search("Wrote port", data):
+    if not self.env.running and re.search(b"Wrote port", data):
       self.env.running = True
       sublime.set_timeout(self.ignition, 0)
 
