@@ -806,7 +806,7 @@ class Server(ServerListener, EnsimeCommon):
       if ensime_jar: ensime_jar.close()
 
   def on_server_data(self, data):
-    str_data = str(data).replace("\r\n", "\n").replace("\r", "\n")
+    str_data = data.decode('utf-8').replace("\r\n", "\n").replace("\r", "\n")
     self.log_server(str_data)
 
   def shutdown(self):
