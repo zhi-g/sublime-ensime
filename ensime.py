@@ -365,7 +365,7 @@ class ClientSocket(EnsimeCommon):
         handler.on_client_async_data(data)
 
   def receive_loop(self):
-    while self.connected:
+    while self.isConnected():
       try:
         msglen = self.socket.recv(6)
         if msglen:
@@ -392,13 +392,16 @@ class ClientSocket(EnsimeCommon):
         else:
           raise Exception("fatal error: recv returned None")
       except Exception:
-        self.log_client("*****    ERROR     *****")
-        self.log_client(traceback.format_exc())
-        self.connected = False
-        self.status_message("Ensime server has disconnected")
-        # todo. do we need to check session_ids somewhere else as well?
-        if self.env.session_id == self.session_id:
-          self.env.controller.shutdown()
+        if self.isConnected():
+          self.log_client("*****    ERROR     *****")
+          self.log_client(traceback.format_exc())
+          self.connected = False
+          self.status_message("Ensime server has disconnected")
+          # todo. do we need to check session_ids somewhere else as well?
+          if self.env.session_id == self.session_id:
+            self.env.controller.shutdown()
+        else:
+          self.log_client("Client Socket closed")
 
   def start_receiving(self):
     t = threading.Thread(name = "ensime-client-" + str(self.w.id()) + "-" + str(self.port), target = self.receive_loop)
@@ -422,6 +425,13 @@ class ClientSocket(EnsimeCommon):
       self.log_client("Cannot connect to Ensime server:  " + str(e.args))
       self.status_message("Cannot connect to Ensime server")
       self.env.controller.shutdown()
+    finally:
+      self._connect_lock.release()
+
+  def isConnected(self):
+    self._connect_lock.acquire()
+    try:
+      return self.connected
     finally:
       self._connect_lock.release()
 
