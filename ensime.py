@@ -711,7 +711,7 @@ class ServerProcess(EnsimeCommon):
   def read_stdout(self):
     while True:
       data = os.read(self.proc.stdout.fileno(), 2**15)
-      if data != "":
+      if data != b"":
         for listener in self.listeners:
           if listener:
             listener.on_server_data(data)
@@ -722,7 +722,7 @@ class ServerProcess(EnsimeCommon):
   def read_stderr(self):
     while True:
       data = os.read(self.proc.stderr.fileno(), 2**15)
-      if data != "":
+      if data != b"":
         for listener in self.listeners:
           if listener:
             listener.on_server_data(data)
