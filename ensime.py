@@ -76,7 +76,7 @@ class EnsimeCommon(object):
         print(detailed_info)
 
   def is_valid(self):
-    return self.env and self.env.valid
+    return bool(self.env and self.env.valid)
 
   def is_running(self):
     return self.is_valid() and self.env.running
@@ -91,8 +91,8 @@ class EnsimeCommon(object):
 
   def in_project(self, wannabe = None):
     filename = self._filename_from_wannabe(wannabe)
-    extension_ok = filename and (filename.endswith("scala") or filename.endswith("java"))
-    subpath_ok = self.env and is_subpath(self.env.project_root, filename)
+    extension_ok = bool(filename and (filename.endswith("scala") or filename.endswith("java")))
+    subpath_ok = bool(self.env and is_subpath(self.env.project_root, filename))
     return extension_ok and subpath_ok
 
   def project_relative_path(self, wannabe):
@@ -269,15 +269,15 @@ class ProjectFileOnly:
 
 class NotDebuggingOnly:
   def is_enabled(self):
-    return self.is_running() and not self.env.profile
+    return bool(self.is_running() and not self.env.profile)
 
 class DebuggingOnly:
   def is_enabled(self):
-    return self.is_running() and self.env.profile
+    return bool(self.is_running() and self.env.profile)
 
 class FocusedOnly:
   def is_enabled(self):
-    return self.is_running() and self.env.focus
+    return bool(self.is_running() and self.env.focus)
 
 class EnsimeToolView(EnsimeCommon):
   def __init__(self, env):
@@ -1685,7 +1685,7 @@ class Focus(object):
 
 class Output(EnsimeToolView):
   def can_show(self):
-    return (not self.env._output)
+    return bool(self.env._output)
 
   @property
   def name(self):
@@ -1711,10 +1711,7 @@ class Output(EnsimeToolView):
 
 class Stack(EnsimeToolView):
   def can_show(self):
-    if (self.env and self.env.focus):
-      return True
-    else:
-      return False
+    return bool(self.env and self.env.focus)
 
   @property
   def name(self):
@@ -1963,11 +1960,7 @@ class WatchRoot(WatchNode):
 
 class Watches(EnsimeToolView):
   def can_show(self):
-    if self.env and self.env.focus:
-      return True
-    else:
-      return False
-
+    return bool(self.env and self.env.focus)
 
   @property
   def name(self):
