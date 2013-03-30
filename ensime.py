@@ -1396,7 +1396,7 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
   def run(self, edit, target= None):
     pos = int(target or self.v.sel()[0].begin())
     word  = self.v.substr(self.v.word(pos))
-    if (len(strip(word)) > 0):
+    if (len(word.strip()) > 0):
       if self.v.is_dirty():
         self.v.run_command('save')
       self.rpc.import_suggestions(self.v.file_name(), pos, [word] , self.env.settings.get("max_import_suggestions", 10) , self.handle_sugestions_response)
