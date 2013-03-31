@@ -279,6 +279,19 @@ class FocusedOnly:
   def is_enabled(self):
     return bool(self.is_running() and self.env.focus)
 
+class PrivateToolViewUpdateCommand(EnsimeTextCommand):
+  def run(self, edit, content):
+    self.view.replace(edit, Region(0, self.view.size()), content)
+    self.view.sel().clear()
+    self.view.sel().add(Region(0, 0))
+
+class PrivateToolViewAppendCommand(EnsimeTextCommand):
+  def run(self, edit, content):
+    selection_was_at_end = len(self.v.sel()) == 1 and self.v.sel()[0] == sublime.Region(self.v.size())
+    self.view.insert(edit, self.view.size(), content)
+    if selection_was_at_end:
+      self.view.show(self.view.size())
+
 class EnsimeToolView(EnsimeCommon):
   def __init__(self, env):
     super(EnsimeToolView, self).__init__(env.w)
@@ -319,12 +332,7 @@ class EnsimeToolView(EnsimeCommon):
 
   def _update_v(self, content):
     if self.v != None:
-      v = self.v
-      edit = v.begin_edit()
-      v.replace(edit, Region(0, v.size()), content)
-      v.end_edit(edit)
-      v.sel().clear()
-      v.sel().add(Region(0, 0))
+      self.v.run_command("private_tool_view_update",{'content': content})
 
   def clear(self):
     self._update_v("")
@@ -1699,12 +1707,7 @@ class Output(EnsimeToolView):
     if data:
       self.env._output += data
       if self.v != None:
-        selection_was_at_end = len(self.v.sel()) == 1 and self.v.sel()[0] == sublime.Region(self.v.size())
-        edit = self.v.begin_edit()
-        self.v.insert(edit, self.v.size(), data)
-        if selection_was_at_end:
-          self.v.show(self.v.size())
-        self.v.end_edit(edit)
+        self.v.run_command("private_tool_view_append",{'content': data})
 
   def render(self):
     return self.env._output
