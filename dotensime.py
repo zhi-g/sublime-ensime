@@ -136,7 +136,7 @@ def create(window, from_noconfig = False, from_scratch = False, from_sbt = False
       return sublime.ok_cancel_dialog(message)
 
     def fill_in_dot_ensime_with_pre_sbt_mock_config(self, project_root):
-      message = ";; Sublime is about to run the following shell command:\n"
+      message = ";; Sublime is about to run the following commands:\n"
       message += ";;\n"
       message += ";;    cd \"" + project_root + "\"\n"
       message += ";;    sbt \"ensime generate\"\n"
@@ -144,7 +144,8 @@ def create(window, from_noconfig = False, from_scratch = False, from_sbt = False
       message += ";; In a moment a build panel will pop up and progressively display the output of SBT.\n"
       message += ";; If everything goes well, this file will be filled in with an Ensime configuration filled in from your SBT project.\n"
       message += ";; (In case if this buffer doesn't get updated after SBT finishes, click File > Revert File to forcibly reload the file from disk).\n"
-      message += ";; If something doesn't work, and you can't figure it out, feel free to contact us at dev@sublimescala.org.\n"
+      message += ";; If something doesn't work, try running the commands provided above from your terminal.\n"
+      message += ";; (If you can't figure it out, feel free to contact us at dev@sublimescala.org).\n"
       self.fill_in_dot_ensime_with_mock_config(project_root, message)
 
     def add_ensime_sbt_cmd_to_plugins(self, project_root):
@@ -167,7 +168,7 @@ def create(window, from_noconfig = False, from_scratch = False, from_sbt = False
 
     def run_ensime_generate(self, project_root):
       self.w.open_file(project_root + os.sep + ".ensime")
-      cmd = sbt_command("ensime generate")
+      cmd = sbt_command(window, "ensime generate")
       if cmd: self.w.run_command("exec", {"cmd": cmd, "working_dir": project_root})
 
     def fill_in_dot_ensime_from_sbt_project(self, project_root):
