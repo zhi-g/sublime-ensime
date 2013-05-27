@@ -14,6 +14,7 @@ from constants import *
 from paths import *
 from rpc import *
 from sbt import *
+from strings import *
 
 class EnsimeCommon(object):
   def __init__(self, owner):
@@ -74,7 +75,7 @@ class EnsimeCommon(object):
         exc_type, exc_value, exc_tb = sys.exc_info()
         detailed_info = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
         print detailed_info
-              
+
   def prepare_log_message(self, data):
     buffer = "["+str(datetime.datetime.now())+"]: "
     buffer += encode_if_unicode(data.strip())

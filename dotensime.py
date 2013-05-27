@@ -4,6 +4,7 @@ import sexp
 from sexp import key, sym
 from paths import *
 from sbt import *
+from strings import *
 
 def locations(window):
   """Intelligently guess the appropriate .ensime file locations for the
