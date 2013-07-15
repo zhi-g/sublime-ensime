@@ -92,8 +92,8 @@ if you catch SublimeScala misbehaving: https://github.com/sublimescala/sublime-e
        If you want to disable these bindings or change them bindings to something else,
        adjust the config at `Preferences > Package Settings > Mousemap - Default`.
 
-    c. For Windows users, make sure the Line Endings setting in Sublime Text 2 is set to Unix.
-       You may do this by going to View > Line Endings and selecting 'Unix'.
+    c. For Windows users, make sure the `Line Endings` setting is set to `Unix`.
+       You may do this by going to `View > Line Endings` and selecting `Unix`.
 
 ## How to use?
 
@@ -109,7 +109,7 @@ or `ensime` if it doesn't. Keep an eye on this message - it's an indicator of th
 
 ## Troubleshooting
 
-If you find that some features of ensime are not working properly (i.e. Go To Definition or Error Highlighting), then check the Line Endings setting in Sublime Text 2.  On Windows, the line endings is set to 'Windows' by default.  Simply change this setting to 'Unix' by going to View > Line Endings and selecting 'Unix'.
+If you find that some features of Ensime are not working properly (i.e. Go To Definition or Error Highlighting), then check the `Line Endings` setting in Sublime Text 2.  On Windows, the line endings is set to `Windows` by default.  Simply change this setting to `Unix` by going to `View > Line Endings` and selecting `Unix`.
 
 ## Contacts
 
