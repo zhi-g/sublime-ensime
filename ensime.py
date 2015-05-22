@@ -135,6 +135,9 @@ class EnsimeCommon(object):
   def redraw_all_debug_focuses(self): self._invoke_all_colorers("redraw_debug_focus")
   def redraw_stack_focus(self, view = "default"): self._invoke_view_colorer("redraw_stack_focus", view)
   def redraw_all_stack_focuses(self): self._invoke_all_colorers("redraw_stack_focus")
+  #macros
+  def redraw_all_macromarkers(self): self._invoke_all_colorers("redraw_macromarkers", view)
+  def redraw_macromarkers(self, view): self._invoke_view_colorer("redraw_macromarkers", view)
 
 class EnsimeWindowCommand(EnsimeCommon, WindowCommand):
   def __init__(self, window):
@@ -455,8 +458,10 @@ class Client(ClientListener, EnsimeCommon):
     with open(port_file) as f: self.port = int(f.read())
     self.timeout = timeout
     self.init_counters()
+    #methods in the client
     methods = filter(lambda m: m[0].startswith("message_"), inspect.getmembers(self, predicate=inspect.ismethod))
     self.log_client("reflectively found " + str(len(methods)) + " message handlers: " + str(methods))
+    #handlers - same names as the method names with small modifs
     self.handlers = dict((":" + m[0][len("message_"):].replace("_", "-"), (m[1], None, None)) for m in methods)
 
   def startup(self):
@@ -528,7 +533,7 @@ class Client(ClientListener, EnsimeCommon):
       payload = None
       if len(data) == 1: payload = data[0]
       if len(data) > 1: payload = data
-      return handler(msg_id, payload)
+      return handler(msg_id, payload) #call the handler
     else:
       self.log_client("unexpected message type: " + msg_type)
 
@@ -638,6 +643,15 @@ class Client(ClientListener, EnsimeCommon):
   def message_debug_event(self, msg_id, payload):
     debug_event = rpc.DebugEvent.parse(payload)
     if debug_event: self.env.debugger.handle(debug_event)
+
+  def _update_macromarkers():
+    print "update macro markers"
+    self.redraw_macromarkers()
+
+  #@call_back_into_ui_thread
+  def message_macros(self, msg_id, payload):
+    macros = rpc.MacroExpansions.parse(payload)
+    if macros : self._update_macromarkers()
 
   def init_counters(self):
     self._counter = 0
@@ -920,6 +934,7 @@ class Daemon(EnsimeEventListener):
     if same_paths(self.v.file_name(), self.env.session_file):
       self.env.load_session()
       self.redraw_all_breakpoints()
+      self.redraw_all_macromarkers()
 
   def on_activated(self):
     # print "on_activated"
@@ -1076,6 +1091,28 @@ class Colorer(EnsimeCommon):
           self.env.settings.get("breakpoint_icon"),
           sublime.HIDDEN)
           # sublime.DRAW_OUTLINED)
+
+  #Macro markers:
+  def redraw_macromarkers(self):
+    #do nothing for now
+    print "redraw macro markers"
+    self.v.erase_regions(ENSIME_MACRO_REGION)
+    if self.v.is_loading():
+      sublime.set_timeout(self.redraw_macromarkers, 100)
+    else:
+      if self.env:
+        relevant_macros = filter(
+          lambda macro: same_paths(macro.file_name, self.v.file_name()),
+        self.env.macromarkers)
+        regions = [self.v.full_line(self.v.text_point(macro.line - 1, 0))
+                    for macro in relevant_macros]
+        self.v.add_regions(
+          ENSIME_MACRO_REGION,
+          regions,
+          self.env.settings.get("macro_scope"),
+          self.env.settings.get("macro_icon"),
+          sublime.HIDDEN)
+
 
   def redraw_debug_focus(self):
     self.v.erase_regions(ENSIME_DEBUGFOCUS_REGION)
@@ -1468,6 +1505,11 @@ class EnsimeClearBreakpoints(EnsimeWindowCommand):
       if self.env.profile: self.rpc.clear_all_breaks()
       self.env.save_session()
       self.redraw_all_breakpoints()
+
+#class EnsimeExpandMacro(ProjectFileOnly, EnsimeTextCommand):
+#  def run(self, edit):
+#    file_name = self.v.file_name()
+#    if file_name and len(self.v.sel()) == 1:
 
 class EnsimeStartDebugger(NotDebuggingOnly, EnsimeWindowCommand):
   def run(self):

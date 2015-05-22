@@ -133,6 +133,7 @@ class EnsimeEnvironment(object):
     self.profile_being_launched = None
     self.profile = None # launch config used in current debug session
     self.breakpoints = []
+    self.macromarkers = []
     self.focus = None
     self.backtrace = None
     self.stackframe = None

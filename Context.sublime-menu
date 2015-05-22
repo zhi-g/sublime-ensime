@@ -47,7 +47,14 @@
               { "caption": "Show stack", "command": "ensime_show_stack" },
               { "caption": "Show watches", "command": "ensime_show_watches" }
             ]
-          }
+          }, 
+           {
+                    "caption": "Macros",
+                    "children":
+                    [
+                      { "caption": "Expand Macro", "command": "ensime_expand_macro" }
+                    ]
+                   }
         ]
     }
 ]

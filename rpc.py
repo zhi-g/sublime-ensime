@@ -49,6 +49,16 @@ class Completion(ActiveRecord):
     self.type_id = m[":type-id"]
     self.to_insert = m[":to-insert"] if ":to-insert" in m else None
 
+#Macros 
+class MacroExpansions(ActiveRecord):
+  def populate(self, m):
+    self.macros = MacroExpansion.parse_list(m[":macros"]) if ":macros" in m else None 
+
+class MacroExpansion(ActiveRecord):
+  def populate(self, m):
+     self.expansion = m[":expansion"]
+     self.pos = Position.parse(m[":pos"]) if ":pos" in m else None
+
 class Position(ActiveRecord):
   def populate(self, m):
     self.file_name = m[":file"] if ":file" in m else None
@@ -406,3 +416,7 @@ class Rpc(object):
 
   @sync_rpc()
   def debug_to_string(self, thread_id, debug_location): pass
+
+  #Macros
+  @async_rpc()
+  def macros_mark(): pass

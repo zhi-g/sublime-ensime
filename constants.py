@@ -10,3 +10,5 @@ ENSIME_ERROR_UNDERLINE_REGION = "ensime-error-underline"
 ENSIME_BREAKPOINT_REGION = "ensime-breakpoint"
 ENSIME_DEBUGFOCUS_REGION = "ensime-debugfocus"
 ENSIME_STACKFOCUS_REGION = "ensime-stackfocus"
+#macros
+ENSIME_MACRO_REGION = "ensime-macro"

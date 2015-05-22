@@ -1,3 +1,4 @@
+
 import sublime, os, sys, traceback, json, re
 from paths import *
 
@@ -17,6 +18,31 @@ class Breakpoint(object):
 
   def is_valid(self):
     return not not self.file_name and self.line != None
+
+    
+class MacroMarker(object):
+  def __init__(self, file_name, line):
+    self.file_name = file_name or ""
+    self.line = line or 0
+
+  def is_meaningful(self):
+    return self.file_name != "" or self.line !=0
+
+  def is_valid(self): #not not just to transform it into bool?
+    return not not self.file_name and self.line != None
+
+class MacroExpansion(object):
+  def __init__(self, file_name, line, expansion):
+    self.file_name = file_name or ""
+    self.line = line or 0
+    self.expansion = expansion or ""
+
+  def is_meaningful(self):
+    return self.file_name != "" or self.line != 0 or expansion != ""
+
+  def is_valid(self):
+    return not not self.file_name and self.line != None and not not self.expansion
+
 
 class Launch(object):
   def __init__(self, name, main_class, args, remote_address):
