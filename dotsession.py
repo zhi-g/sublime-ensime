@@ -1,4 +1,3 @@
-
 import sublime, os, sys, traceback, json, re
 from paths import *
 
@@ -108,6 +107,7 @@ def load(env):
       breakpoints = filter(lambda b: b.is_meaningful(), breakpoints)
       launches_list = map(lambda c: Launch(c.get("name"), c.get("main_class"), c.get("args"), c.get("remote_address")), session.get("launch_configs", []))
       launches = {}
+      
       # todo. this might lose user data
       for c in launches_list: launches[c.name] = c
       launch_key = session.get("current_launch_config") or ""

@@ -523,7 +523,8 @@ class Client(ClientListener, EnsimeCommon):
     # (:background-message "Initializing Analyzer. Please wait...")
     # (:compiler-ready t)
     # (:typecheck-result (:lang :scala :is-full t :notes nil))
-    msg_type = str(data[0])
+    msg_type = str(data[0]) 
+    self.log_client("Message type is : "+ str(msg_type))
     handler = self.handlers.get(msg_type)
 
     if handler:
@@ -538,6 +539,7 @@ class Client(ClientListener, EnsimeCommon):
       self.log_client("unexpected message type: " + msg_type)
 
   def message_return(self, msg_id, payload):
+    self.log_client("Return message " + str(msg_id))
     handler, call_back_into_ui_thread, req_time = self.handlers.get(msg_id)
     if handler: del self.handlers[msg_id]
     def invoke_subscribed_handler(success, payload = None):
@@ -546,6 +548,7 @@ class Client(ClientListener, EnsimeCommon):
         # however note that we need to ping sync callbacks in any case
         # in order to prevent freezes upon erroneous responses
         if call_back_into_ui_thread and success:
+          self.log_client("Handler is " + str(handler.__name__))
           sublime.set_timeout(bind(handler, payload), 0)
         else:
           handler(payload)
@@ -561,6 +564,7 @@ class Client(ClientListener, EnsimeCommon):
     if reply_type == ":ok":
       payload = payload[1]
       if handler:
+        self.log_client("there is a hadler for this message " + str(handler))
         invoke_subscribed_handler(success = True, payload = payload)
       else:
         self.log_client("warning: no handler registered for message #" + str(msg_id) + " with payload " + str(payload))
@@ -648,10 +652,18 @@ class Client(ClientListener, EnsimeCommon):
     print "update macro markers"
     self.redraw_macromarkers()
 
-  #@call_back_into_ui_thread
-  def message_macros(self, msg_id, payload):
+ 
+  @call_back_into_ui_thread
+  def message_macro_expansion(self, msg_id, payload):
     macros = rpc.MacroExpansions.parse(payload)
-    if macros : self._update_macromarkers()
+    if macros : self._update_macromarkers() #not the goodthing to do for now
+
+  @call_back_into_ui_thread
+  def message_macro_positions(self, msg_id, payload):
+    #update macro markers
+    self.log_client("Macro positions " + payload)
+    positions = rpc.MacroMarkers.parse(payload)
+    if positions : self._update_macromarkers() 
 
   def init_counters(self):
     self._counter = 0
@@ -923,14 +935,21 @@ class Controller(EnsimeCommon, ClientListener, ServerListener):
 class Daemon(EnsimeEventListener):
 
   def on_load(self):
-    # print "on_load"
+    print "on_load"
     if self.is_running() and self.in_project():
       self.rpc.typecheck_file(self.v.file_name())
+      print "show macro positions"
+      self.rpc.show_macros_in_file(self.v.file_name())
+      self.redraw_all_macromarkers()
+
 
   def on_post_save(self):
     # print "on_post_save"
     if self.is_running() and self.in_project():
       self.rpc.typecheck_file(self.v.file_name())
+      print "show macro positions"
+      self.rpc.show_macros_in_file(self.v.file_name())
+
     if same_paths(self.v.file_name(), self.env.session_file):
       self.env.load_session()
       self.redraw_all_breakpoints()
@@ -1094,7 +1113,6 @@ class Colorer(EnsimeCommon):
 
   #Macro markers:
   def redraw_macromarkers(self):
-    #do nothing for now
     print "redraw macro markers"
     self.v.erase_regions(ENSIME_MACRO_REGION)
     if self.v.is_loading():
@@ -1106,11 +1124,13 @@ class Colorer(EnsimeCommon):
         self.env.macromarkers)
         regions = [self.v.full_line(self.v.text_point(macro.line - 1, 0))
                     for macro in relevant_macros]
+
+        icon = '../Ensime/icons/m'
         self.v.add_regions(
           ENSIME_MACRO_REGION,
           regions,
           self.env.settings.get("macro_scope"),
-          self.env.settings.get("macro_icon"),
+          icon,
           sublime.HIDDEN)
 
 
@@ -1506,10 +1526,24 @@ class EnsimeClearBreakpoints(EnsimeWindowCommand):
       self.env.save_session()
       self.redraw_all_breakpoints()
 
-#class EnsimeExpandMacro(ProjectFileOnly, EnsimeTextCommand):
-#  def run(self, edit):
-#    file_name = self.v.file_name()
-#    if file_name and len(self.v.sel()) == 1:
+class EnsimeExpandMacro(ProjectFileOnly, EnsimeTextCommand):
+  def run(self, edit):
+    file_name = self.v.file_name()
+    if file_name and len(self.v.sel()) == 1:
+      #get the line number
+      line, _ = self.v.rowcol(self.v.sel()[0].begin())
+      current_line = line + 1
+      #do other things
+      #self.env.expander.expand(file_name, current_line)
+      self.redraw_all_macromarkers
+
+class EnsimeShowMacrosInFile(ProjectFileOnly, EnsimeTextCommand):
+  def run(self, edit):
+    file_name = self.v.file_name()
+    if file_name:
+      #the file exists => ask the ensime server to send the positions of the marcos
+      print "hello"
+
 
 class EnsimeStartDebugger(NotDebuggingOnly, EnsimeWindowCommand):
   def run(self):
@@ -1587,6 +1621,12 @@ class EnsimeDoubleClick(EnsimeSloppyMouseCommand):
   def run(self, edit):
     handler = self.calculate_handler()
     if handler: handler.handle_event("double_click", self.v.sel()[0].a)
+
+#for macro expansion
+'''class Macros(EnsimeCommon):
+  def __init__(self, env):
+    super(Macros, self).__init__(env.w)
+'''
 
 class Debugger(EnsimeCommon):
   def __init__(self, env):
@@ -1710,6 +1750,7 @@ class Debugger(EnsimeCommon):
 
   def continue_(self):
     self.rpc.debug_continue(self.env.focus.thread_id)
+
 
 class Focus(object):
   def __init__(self, thread_id, thread_name, file_name, line):

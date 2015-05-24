@@ -17,20 +17,18 @@
   "ensime_statusbar_heartbeat_joint": ": ",
   "ensime_statusbar_maxlength": 150,
   "ensime_statusbar_showerrors": true,
-
   // performance settings
   "timeout_sync_roundtrip": 3,
   "timeout_completions": 1.0,
   "max_import_suggestions": 20,
-
   // stylistic settings
   "error_highlight": true,
   "error_underline": false,
   "error_scope": "invalid.illegal",
   "error_icon": "",
   "breakpoint_scope": "ensime.breakpoint",
- // "breakpoint_icon": "circle",
-  "macro_icon": "circle",
+  "breakpoint_icon": "circle",
+  "macro_icon": "",
   "macro_scope": "ensime.macro",
   "debugfocus_scope": "ensime.debugfocus",
   "debugfocus_icon": "",

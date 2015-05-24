@@ -50,6 +50,7 @@ class Completion(ActiveRecord):
     self.to_insert = m[":to-insert"] if ":to-insert" in m else None
 
 #Macros 
+#to be adapted to the new protocol on server-side
 class MacroExpansions(ActiveRecord):
   def populate(self, m):
     self.macros = MacroExpansion.parse_list(m[":macros"]) if ":macros" in m else None 
@@ -58,6 +59,11 @@ class MacroExpansion(ActiveRecord):
   def populate(self, m):
      self.expansion = m[":expansion"]
      self.pos = Position.parse(m[":pos"]) if ":pos" in m else None
+
+class MacroMarkers(ActiveRecord):
+  def populate(self, m):
+    print "Populate macro markers positions"
+    self.pos = Position.parse_list(Position, m[":macro-positions"]) if ":macro-positions" in m else None
 
 class Position(ActiveRecord):
   def populate(self, m):
@@ -419,4 +425,4 @@ class Rpc(object):
 
   #Macros
   @async_rpc()
-  def macros_mark(): pass
+  def show_macros_in_file(self, file_name): pass
