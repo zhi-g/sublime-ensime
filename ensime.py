@@ -112,7 +112,6 @@ class EnsimeCommon(object):
     args = args[1:]
     if view == "default": view = self.v
     if view != None:
-      print "view"
       colorer = Colorer(view)
       getattr(colorer, method)(*args)
 
@@ -1494,7 +1493,7 @@ class EnsimeShowMacrosInFile(ProjectFileOnly, EnsimeTextCommand):
       if poss and poss.pos: 
         for p in poss.pos: 
           relevant_macromarkers.append(dotsession.MacroMarker(p.file_name, p.line))
-          
+
       self.env.macromarkers = relevant_macromarkers
       self.redraw_macromarkers()
 
