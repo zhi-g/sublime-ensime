@@ -63,7 +63,13 @@ class MacroExpansion(ActiveRecord):
 class MacroMarkers(ActiveRecord):
   def populate(self, m):
     print "Populate macro markers positions"
-    self.pos = Position.parse_list(Position, m[":macro-positions"]) if ":macro-positions" in m else None
+    print str(m)
+    self.pos = SourcePosition.parse_list(m[":macro-positions"]) if ":macro-positions" in m else None
+
+class SourcePosition(ActiveRecord):
+  def populate(self, m):
+    self.file_name = m[":file"] if ":file" in m else None
+    self.line = m[":line"] if ":line" in m else None
 
 class Position(ActiveRecord):
   def populate(self, m):
@@ -359,6 +365,10 @@ class Rpc(object):
   @sync_rpc(Completion.parse_list)
   def completions(self, file_name, position, max_results, case_sensitive, reload_from_disk): pass
 
+  #Macros
+  @async_rpc(MacroMarkers.parse)
+  def show_macros_in_file(self, file_name): pass
+
   @async_rpc(Type.parse)
   def type_at_point(self, file_name, position): pass
 
@@ -422,7 +432,3 @@ class Rpc(object):
 
   @sync_rpc()
   def debug_to_string(self, thread_id, debug_location): pass
-
-  #Macros
-  @async_rpc()
-  def show_macros_in_file(self, file_name): pass
