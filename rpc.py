@@ -51,14 +51,14 @@ class Completion(ActiveRecord):
 
 #Macros 
 #to be adapted to the new protocol on server-side
-class MacroExpansions(ActiveRecord):
-  def populate(self, m):
-    self.macros = MacroExpansion.parse_list(m[":macros"]) if ":macros" in m else None 
-
 class MacroExpansion(ActiveRecord):
   def populate(self, m):
-     self.expansion = m[":expansion"]
-     self.pos = Position.parse(m[":pos"]) if ":pos" in m else None
+     self.expansion = MacroExpansion_.parse(m[":macro-expansion"]) if ":macro-expansion"  in m else None
+
+class MacroExpansion_(ActiveRecord):
+  def populate(self, m):
+    self.expansion_string = m[":expansion"] if ":expansion" in m else None
+    self.pos = SourcePosition.parse(m[":pos"]) if ":pos" in m else None
 
 class MacroMarkers(ActiveRecord):
   def populate(self, m):
@@ -311,6 +311,7 @@ def _mk_req(func, *args, **kwargs):
       expected = "expected " + str(len(spec_args)) + " args " + str(spec_args) + ", "
       actual = "actual " + str(len(args)) + " args " + str(args) + " with types " + str(map(lambda a: type(a), args))
       raise Exception(preamble + expected + actual)
+
   for arg in args[1:]: # strip off self
     if hasattr(arg, "unparse"): argreq = arg.unparse()
     else: argreq = [arg]
@@ -368,6 +369,9 @@ class Rpc(object):
   #Macros
   @async_rpc(MacroMarkers.parse)
   def show_macros_in_file(self, file_name): pass
+
+  @async_rpc(MacroExpansion.parse)
+  def expand_macro(self, file_name, line): pass
 
   @async_rpc(Type.parse)
   def type_at_point(self, file_name, position): pass

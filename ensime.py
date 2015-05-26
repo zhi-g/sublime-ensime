@@ -1495,6 +1495,7 @@ class EnsimeShowMacrosInFile(ProjectFileOnly, EnsimeTextCommand):
           relevant_macromarkers.append(dotsession.MacroMarker(p.file_name, p.line))
 
       self.env.macromarkers = relevant_macromarkers
+      #self.env.macromarkers.append(dotsession.MacroMarker(file_name, 7))
       self.redraw_macromarkers()
 
 
@@ -1506,8 +1507,18 @@ class EnsimeExpandMacro(ProjectFileOnly, EnsimeTextCommand):
       line, _ = self.v.rowcol(self.v.sel()[0].begin())
       current_line = line + 1
       #do other things
-      #self.env.expander.expand(file_name, current_line)
-      self.redraw_all_macromarkers
+      self.rpc.expand_macro(file_name, current_line, self.handle_macro_expansion)
+
+  def handle_macro_expansion(self, exp):
+    print "handle macro expansion"
+    if exp and exp.expansion:
+      print "expansion found"
+    else :
+      print "No expanstions found"
+
+
+
+
 
 class EnsimeBuild(ProjectExists, EnsimeWindowCommand):
   def run(self):
