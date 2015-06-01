@@ -141,6 +141,8 @@ class EnsimeEnvironment(object):
 
     #macro stuff
     self.macromarkers = []
+    #cache macro expansions : pos -> expansion
+    self.active_expansions = dict([])
 
 
     # load the session (if exists)

@@ -30,6 +30,8 @@
   "breakpoint_icon": "circle",
   "macro_icon": "",
   "macro_scope": "ensime.macro",
+  "expansion_icon": "",
+  "expansion_scope": "expansion.scope",
   "debugfocus_scope": "ensime.debugfocus",
   "debugfocus_icon": "",
   "stackfocus_scope": "ensime.stackfocus",

@@ -120,7 +120,7 @@ class EnsimeCommon(object):
       if self.w.views_in_group(i):
         v = self.w.active_view_in_group(i)
         colorer = Colorer(v)
-        getattr(colorer, method)(*args)
+        getattr(colorer, method)(*args)  
 
   def colorize(self, view = "default"): self._invoke_view_colorer("colorize", view)
   def colorize_all(self): self._invoke_all_colorers("colorize")
@@ -938,6 +938,8 @@ class Daemon(EnsimeEventListener):
     if self.is_running() and self.in_project():
       self.rpc.typecheck_file(self.v.file_name())
 
+
+
   def on_post_save(self):
     if self.is_running() and self.in_project():
       self.rpc.typecheck_file(self.v.file_name())
@@ -951,6 +953,10 @@ class Daemon(EnsimeEventListener):
     if self.in_project():
       self.env.notee = self.v
       self.env.notes.refresh()
+      #will show where macros are in the file when the window is activated 
+      edit = self.v.begin_edit()
+      self.v.run_command("ensime_show_macros_in_file", edit)
+      self.v.end_edit(edit)
 
   def on_selection_modified(self):
     self.redraw_status()
@@ -970,6 +976,25 @@ class Daemon(EnsimeEventListener):
       self.env.breakpoints = irrelevant_breakpoints + relevant_breakpoints
       self.env.save_session()
       self.redraw_breakpoints()
+    macrors= self.v.get_regions(ENSIME_MACRO_REGION)
+    if macrors:
+      irrelevant_macromarkers = filter(
+        lambda m: not same_paths(m.file_name, self.v.file_name()), 
+        self.env.macromarkers)
+      def new_macro_position(r):
+        lines = self.v.lines(r)
+        if lines:
+          (linenum, _) = self.v.rowcol(lines[0].begin())
+          return dotsession.MacroMarker(self.v.file_name(), linenum+1)
+      relevant_macromarkers = filter(lambda m: m, map(new_macro_position, macrors))
+      #old_macromarkers = filter(lambda m: same_paths(m.file_name, self.v.file_name()), self.env.macromarkers)
+      self.env.macromarkers = irrelevant_macromarkers + relevant_macromarkers
+      if relevant_macromarkers and self.env.active_expansions:
+        #update expansions - Can't be done naively with the order in which they appear as not all expansions are active at given moment 
+        modified_macro_expansions = filter (lambda key: same_paths(key.file_name, self.v.file_name()), self.env.active_expansions.keys())
+        irrelevant_macro_expansions = filter (lambda key: not same_paths(key.file_name, self.v.file_name()), self.env.active_expansions.keys())
+        #new_positions = 
+
 
 class Colorer(EnsimeCommon):
 
@@ -980,6 +1005,7 @@ class Colorer(EnsimeCommon):
     self.redraw_breakpoints()
     self.redraw_debug_focus()
     self.redraw_stack_focus()
+    self.redraw_macromarkers()
 
   def uncolorize(self):
     self.v.erase_regions(ENSIME_ERROR_OUTLINE_REGION)
@@ -1107,8 +1133,12 @@ class Colorer(EnsimeCommon):
       sublime.set_timeout(self.redraw_macromarkers, 100)
     else:
       if self.env:
+        relevant_macromarkers = filter(
+          lambda m: same_paths(
+            m.file_name, self.v.file_name()),
+          self.env.macromarkers)
         regions = [self.v.full_line(self.v.text_point(macro.line - 1, 0))
-                    for macro in self.env.macromarkers]
+                    for macro in relevant_macromarkers]
 
         icon = '../Ensime/icons/m'
         self.v.add_regions(
@@ -1477,6 +1507,7 @@ class EnsimeAddImport(RunningProjectFileOnly, EnsimeTextCommand):
 
 class EnsimeShowMacrosInFile(ProjectFileOnly, EnsimeTextCommand):
   def run(self, edit):
+    print "ask for mm in " + str(self.v.file_name())
     file_name = self.v.file_name()
     if file_name:
       #the file exists => ask the ensime server to send the positions of the marcos
@@ -1485,7 +1516,7 @@ class EnsimeShowMacrosInFile(ProjectFileOnly, EnsimeTextCommand):
   def handle_marked_positions(self, poss): 
     print "handle marked positions"
     #info should be an empty list or a list od SourcePositions
-    file_name = self.v.file_name
+    file_name = self.v.file_name()
     if file_name:
       #need to remove all the old macromarkers for the same file 
       relevant_macromarkers = filter( lambda m: not (same_paths(m.file_name, file_name)), self.env.macromarkers)
@@ -1506,15 +1537,40 @@ class EnsimeExpandMacro(ProjectFileOnly, EnsimeTextCommand):
       #get the line number
       line, _ = self.v.rowcol(self.v.sel()[0].begin())
       current_line = line + 1
-      #do other things
-      self.rpc.expand_macro(file_name, current_line, self.handle_macro_expansion)
+      macromarker = filter(lambda m:  (same_paths(self.v.file_name(), m.file_name) and m.line == current_line), self.env.macromarkers)
+      print "ask for expansion in " + str(file_name) + " at position " + str(current_line)
+      for m in macromarker:
+        print "Found: " + str(m.file_name) + "  " + str(m.line)
+
+      if len(macromarker) != 0:
+        self.rpc.expand_macro(file_name, current_line, self.handle_macro_expansion)
+      else: 
+        print "Can only expand macros"
+        sublime.status_message("Only macros can be expanded")
 
   def handle_macro_expansion(self, exp):
     print "handle macro expansion"
-    if exp and exp.expansion:
-      print "expansion found"
+    if exp and exp.expansion and exp.expansion.expansion_string:
+      print "expansion found: " + exp.expansion.expansion_string + " in " + str(exp.expansion.pos.file_name) + " on line " + str(exp.expansion.pos.line)
+      point = self.v.sel()[0].begin()
+      edit = self.v.begin_edit()
+      self.v.replace(edit, self.v.sel()[0], "\n"+exp.expansion.expansion_string)
+      self.v.end_edit(edit)
+      macromarker = filter(lambda m: (same_paths(self.v.file_name(), m.file_name) and m.line == self.v.rowcol(point)[0])+1, self.env.macromarkers)
+      #keep the expansions
+      self.env.active_expansions[macromarker[0]] = exp.expansion.expansion_string
+      #needs to be done for all of the lines in the expansion
+      region=[self.v.full_line(self.v.text_point(macromarker[0].line, 0))]
+      icon = '../Ensime/icons/plus'
+      self.v.add_regions(
+        ENSIME_EXPANSION_REGION,
+        region,
+        self.env.settings.get("expansion_scope"),
+        icon,
+        sublime.HIDDEN)
     else :
-      print "No expanstions found"
+      print "No expansions found"
+      sublime.status_message("No expansion found")
 
 
 
@@ -1712,6 +1768,11 @@ class Debugger(EnsimeCommon):
     elif event.type == "exception" or event.type == "breakpoint" or event.type == "step":
       self.env.focus = Focus(event.thread_id, event.thread_name, event.file_name, event.line)
       if event.file_name and event.line:
+        #need to modify for when we have a macro, since line needs to be "remapped" (how do we know that? )
+        relevant_active_expansions = filter(lambda me: same_paths(self.v.file_name(), me.file_name), self.env.active_expansions.keys())
+        if relevant_active_expansions:
+           print "relevant expansions in file"
+           #will need to check if the line is pointing to an expansion
         focus_summary = str(event.file_name) + ", line " + str(event.line)
         self.env.w.open_file("%s:%d:%d" % (self.env.focus.file_name, self.env.focus.line, 1), sublime.ENCODED_POSITION)
       else:

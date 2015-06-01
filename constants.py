@@ -12,3 +12,4 @@ ENSIME_DEBUGFOCUS_REGION = "ensime-debugfocus"
 ENSIME_STACKFOCUS_REGION = "ensime-stackfocus"
 #macros
 ENSIME_MACRO_REGION = "ensime-macro"
+ENSIME_EXPANSION_REGION = "ensime-expansion"
