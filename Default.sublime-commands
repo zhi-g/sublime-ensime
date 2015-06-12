@@ -62,5 +62,21 @@
   {
     "caption": "Ensime: Add Import",
     "command": "ensime_add_import"
+  },
+  {
+    "caption": "Ensime: Show macros",
+    "command": "ensime_show_macros_in_file"
+  },
+  {
+   "caption": "Ensime: Expand Macro", 
+   "command": "ensime_expand_macro"
+  },
+  {
+    "caption": "Ensime: Collapse Macro",
+    "command": "ensime_collapse_macro"
+  }, 
+  {
+    "caption": "Ensime: Collapse All Macro Expansions",
+    "command": "ensime_collapse_all_macros"
   }
 ]

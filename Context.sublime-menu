@@ -53,7 +53,9 @@
                     "children":
                     [
                       { "caption": "Expand Macro", "command": "ensime_expand_macro" },
-                      { "caption": "Show Macros in File", "command": "ensime_show_macros_in_file"}
+                      { "caption": "Show Macros in File", "command": "ensime_show_macros_in_file"},
+                      { "caption": "Collapse Macro Expansion", "command": "ensime_collapse_macro"},
+                      { "caption": "Collapse All Macros' Expansion", "command": "ensime_collapse_all_macros"}
                     ]
                    }
         ]

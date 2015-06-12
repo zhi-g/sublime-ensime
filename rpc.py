@@ -2,6 +2,7 @@ import inspect, functools
 from functools import partial as bind
 import sexp
 from sexp import key, sym
+from paths import *
 
 ############################## DATA STRUCTURES ##############################
 
@@ -66,10 +67,17 @@ class MacroMarkers(ActiveRecord):
     print str(m)
     self.pos = SourcePosition.parse_list(m[":macro-positions"]) if ":macro-positions" in m else None
 
+class FileLength(ActiveRecord):
+  def populate(self, m):
+    print "Populate file length"
+    self.length = m[":file-length"] if ":file-length" in m else None
+    self.file_name = m[":file-name"] if ":file-name" in m else None
+
 class SourcePosition(ActiveRecord):
   def populate(self, m):
     self.file_name = m[":file"] if ":file" in m else None
     self.line = m[":line"] if ":line" in m else None
+    self.length = m[":length"] if ":length" in m else None
 
 class Position(ActiveRecord):
   def populate(self, m):
@@ -373,6 +381,9 @@ class Rpc(object):
   @async_rpc(MacroExpansion.parse)
   def expand_macro(self, file_name, line): pass
 
+  @async_rpc(FileLength.parse)
+  def file_length(self, file_name): pass
+
   @async_rpc(Type.parse)
   def type_at_point(self, file_name, position): pass
 
@@ -400,10 +411,59 @@ class Rpc(object):
   @async_rpc(DebugKickoffResult.parse)
   def _debug_attach(self, host, port): pass
 
+  def _adapt_breakpoint(self, bp):
+    macromarkers = filter(lambda mm: same_paths(mm.file_name, bp.file_name) and bp.line>mm.line, self.env.macromarkers)
+    if macromarkers:
+      print "there are macro markers before"
+      shift = 0
+      for m in macromarkers:
+        if m.expanded and m.expanded == "true":
+          print "line will be adapted"
+          if m.line + m.length >= bp.line:
+            # this case means that we want to put a breakpoint in the interior of a macro expansion, hence the breakpoint has to 
+            # be adapted
+            line_in_macro = bp.line - m.line
+            print "breakpoint is in an expansion, line sent to server is : " +  str(self.env.file_lengths[bp.file_name] + shift + line_in_macro)
+            return self.env.file_lengths[bp.file_name] + shift + line_in_macro #translates to the fake position of this line of the expanion
+          else:
+            # if there are macromarkers preceding the breakpoint and they are expanded this means the breakpoint should 
+            # be adapted before sent to the server, since in the compiled file there aren't any expansions
+            print "breakpoint is preceded by an expansion, decrement the expansion, line is : " + str(bp.line - m.length)
+            bp.line = bp.line - m.length
+        # updates the shift of the expansions: in the plugin that modifies positions, macro positions are to the end of the file,
+        # so if we want to set a breakpoint inside a macro expansion, we need to adapt the breakpoint to the corresponding line, 
+        # taking into account all the previous macro expansions at the end of the file
+        shift = shift + m.length 
+      print "line sent to server is :" + str(bp.line)
+      return bp.line
+    else: 
+      print "no need for adaptation, line sent to server is: " + str(bp.line)
+      #if there are no macro markers smaller than the breakpoint line => nothing to adapt
+      return bp.line
+
+
   def debug_start(self, launch, breakpoints, on_complete = None):
     def set_breakpoints(breakpoints, status):
+      # gets the length of the file of interest
+      def callback(filelength):
+        if filelength:
+          self.env.file_lengths[filelength.file_name] = filelength.length
+          print "file " + filelength.file_name + " is " + str(filelength.length)
+          set_breakpoints(breakpoints, status)
+      
       if status:
-        if breakpoints: self.debug_set_break(breakpoints[0].file_name, breakpoints[0].line, bind(set_breakpoints, breakpoints[1:]))
+        if breakpoints:
+          # macro expansions can modify the positions of breakpoints. If we expand a macro - in the GUI and the gutter
+          # the breakpoints should and will be also modified. However these modified positions can't be send to the 
+          # server/debugger as such since the shown code in the buffer is not known to the debugger
+          bp = breakpoints[0]
+          if bp.file_name in self.env.file_lengths:
+            # often to be able to take into account the expanded code we must know the original length of the program
+            # if the length is not known we ask the server for it
+            bp_line = self._adapt_breakpoint(bp)
+            self.debug_set_break(bp.file_name, bp_line, bind(set_breakpoints, breakpoints[1:]))
+          else:
+            self.get_file_length(bp.file_name, callback)
         else:
           if launch.main_class: self._debug_start(launch.command_line, on_complete)
           elif launch.remote_address: self._debug_attach(launch.remote_host, launch.remote_port, on_complete)
@@ -414,6 +474,8 @@ class Rpc(object):
         if status: set_breakpoints(breakpoints, status)
         elif on_complete: on_complete(status)
       self.debug_clear_all_breaks(callback)
+
+    self.env.file_lengths = dict([]) 
     clear_breakpoints()
 
   @async_rpc()
@@ -436,3 +498,6 @@ class Rpc(object):
 
   @sync_rpc()
   def debug_to_string(self, thread_id, debug_location): pass
+
+  @async_rpc(FileLength.parse)
+  def get_file_length(self, file_name): pass

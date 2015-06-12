@@ -18,17 +18,18 @@ class Breakpoint(object):
   def is_valid(self):
     return not not self.file_name and self.line != None
 
-    
 class MacroMarker(object):
-  def __init__(self, file_name, line):
+  def __init__(self, file_name, line, length):
     self.file_name = file_name or ""
     self.line = line or 0
+    self.length = length or 0
+    self.expanded = None #set it to "true" or "suspended"
 
   def is_meaningful(self):
-    return self.file_name != "" or self.line !=0
+    return self.file_name != "" or self.line !=0 or self.length!=0
 
-  def is_valid(self): #not not just to transform it into bool?
-    return not not self.file_name and self.line != None
+  def is_valid(self): 
+    return not not self.file_name and self.line != None or self.length != None
 
 class MacroExpansion(object):
   def __init__(self, file_name, line, expansion):

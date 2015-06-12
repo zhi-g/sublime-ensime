@@ -140,9 +140,12 @@ class EnsimeEnvironment(object):
     self._output = ""
 
     #macro stuff
-    self.macromarkers = []
+    self.macromarkers = [] #ok
+    self.file_lengths = dict([])
     #cache macro expansions : pos -> expansion
     self.active_expansions = dict([])
+    self.length = None #length of the in program lines: must be known for translations for debug
+
 
 
     # load the session (if exists)
