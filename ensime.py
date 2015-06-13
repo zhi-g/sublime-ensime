@@ -1592,8 +1592,9 @@ class EnsimeCollapseAllMacros(ProjectFileOnly, EnsimeTextCommand):
       self.v.erase(edit, r)
       self.v.end_edit(edit)
     self.v.erase_regions(ENSIME_EXPANSION_REGION)
-    relevant_macromarkers = filter( lambda m: not (same_paths(m.file_name, file_name)), self.env.macromarkers)
+    relevant_macromarkers = filter( lambda m: (same_paths(m.file_name, file_name)), self.env.macromarkers)
     for m in relevant_macromarkers:
+      print "reinit expanded"
       m.expanded = None
 
 
